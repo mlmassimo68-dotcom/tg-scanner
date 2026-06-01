@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#060a10">
+<link rel="manifest" href="manifest.json">
+<title>TG Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg0:#060a10;--bg1:#0a1018;--bg2:#0e1520;--bg3:#131d28;
+  --border:#1c2d3f;--border2:#243850;
+  --text:#b8cfe0;--muted:#3d5570;
+  --green:#00e676;--gdim:rgba(0,230,118,.12);
+  --red:#ff3d5a;--rdim:rgba(255,61,90,.12);
+  --yellow:#ffd740;--ydim:rgba(255,215,64,.1);
+  --aqua:#18ffff;--adim:rgba(24,255,255,.1);
+  --orange:#ff9100;--purple:#ea80fc;--blue:#448aff;
+  --mono:'Share Tech Mono',monospace;
+  --cond:'Barlow Condensed',sans-serif;
+  --sat:env(safe-area-inset-top,0px);
+  --sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg0);color:var(--text);font-family:var(--mono);overflow:hidden}
+.app{display:flex;flex-direction:column;height:100dvh;padding-top:var(--sat);padding-bottom:var(--sab)}
+
+/* HEADER */
+.hdr{flex-shrink:0;background:var(--bg1);border-bottom:1px solid var(--border);padding:8px 14px 7px;display:flex;align-items:center;justify-content:space-between}
+.hdr-brand{font-family:var(--cond);font-size:20px;font-weight:900;letter-spacing:3px;color:var(--aqua);text-transform:uppercase;line-height:1}
+.hdr-sub{font-size:9px;letter-spacing:2px;color:var(--muted);margin-top:1px}
+.hdr-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.hdr-time{font-size:13px;color:var(--yellow);letter-spacing:1px}
+.kz-pill{font-family:var(--cond);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:2px 8px;border-radius:20px;border:1px solid}
+.kz-off{color:var(--muted);border-color:var(--border);background:var(--bg2)}
+.kz-active{color:var(--green);border-color:var(--green);background:var(--gdim)}
+.kz-stop{color:var(--red);border-color:var(--red);background:var(--rdim);animation:blink .7s infinite}
+
+/* STATUS */
+.statusbar{flex-shrink:0;background:var(--bg1);border-bottom:1px solid var(--border);padding:4px 14px;display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;font-size:10px;color:var(--muted)}
+.statusbar::-webkit-scrollbar{display:none}
+.sb-item{display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0}
+.sb-dot{width:6px;height:6px;border-radius:50%}
+.sb-ok{background:var(--green)}.sb-sig{background:var(--yellow);animation:blink .5s infinite}
+.sb-err{background:var(--red)}.sb-trade{background:var(--aqua)}
+
+/* STATUS MSG */
+#statusMsg{flex-shrink:0;font-size:10px;color:var(--yellow);padding:3px 14px;background:var(--bg1);border-bottom:1px solid var(--border);min-height:20px;letter-spacing:.5px}
+
+/* TABS */
+.tabs{flex-shrink:0;display:grid;grid-template-columns:repeat(4,1fr);background:var(--bg1);border-bottom:1px solid var(--border)}
+.tab-btn{padding:9px 4px 8px;text-align:center;font-family:var(--cond);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border:none;background:none;border-bottom:2px solid transparent;cursor:pointer;transition:color .15s,border-color .15s;position:relative}
+.tab-btn.active{color:var(--aqua);border-bottom-color:var(--aqua)}
+.tab-badge{position:absolute;top:5px;right:8px;background:var(--red);color:#fff;font-size:8px;font-weight:900;width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--cond)}
+
+/* PAGES */
+.pages{flex:1;overflow:hidden;position:relative}
+.page{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:10px;display:none}
+.page.active{display:block}
+.last-update{text-align:center;font-size:9px;color:var(--muted);padding:4px 0 8px}
+
+/* ANIMATIONS */
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes fadeup{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+@keyframes slidein{from{transform:translateX(-14px);opacity:0}to{transform:none;opacity:1}}
+@keyframes pulse-g{0%,100%{box-shadow:0 0 0 0 rgba(0,230,118,.4)}50%{box-shadow:0 0 0 6px rgba(0,230,118,0)}}
+
+/* SIGNAL BANNER */
+.sig-banner{background:linear-gradient(120deg,var(--gdim),transparent);border:1px solid var(--green);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;cursor:pointer;animation:slidein .3s ease}
+.sig-banner:active{opacity:.8}
+.sig-pulse{width:10px;height:10px;border-radius:50%;background:var(--green);flex-shrink:0;animation:pulse-g 1.2s infinite}
+.sig-body{flex:1;min-width:0}
+.sig-ticker{font-family:var(--cond);font-size:18px;font-weight:800;color:var(--green);letter-spacing:1.5px}
+.sig-det{font-size:10px;color:var(--text);margin-top:1px}
+.sig-time{font-size:9px;color:var(--muted)}
+.sig-arr{font-size:20px;color:var(--green);flex-shrink:0}
+
+/* SCANNER GRID */
+.scanner-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tcard{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px;cursor:pointer;animation:fadeup .3s ease both;position:relative;overflow:hidden}
+.tcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:10px 10px 0 0;background:var(--border);transition:background .3s}
+.tcard:active{transform:scale(.97)}
+.tcard.has-signal{border-color:var(--green)}.tcard.has-signal::before{background:var(--green)}
+.tcard.has-trade{border-color:var(--aqua)}.tcard.has-trade::before{background:var(--aqua)}
+.tcard.ts-warn{border-color:var(--red);opacity:.75}.tcard.ts-warn::before{background:var(--red)}
+.tc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px}
+.tc-sym{font-family:var(--cond);font-size:18px;font-weight:900;color:#fff;letter-spacing:1px;line-height:1}
+.tc-leva{font-size:8px;color:var(--orange);font-family:var(--cond);font-weight:700}
+.tc-stars{font-size:9px;color:var(--yellow)}
+.tc-price{font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px}
+.tc-chg{font-size:10px;font-weight:600}
+.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
+.score-row{display:flex;align-items:center;gap:5px;margin-top:5px}
+.score-bar-wrap{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:2px;transition:width .5s}
+.score-num{font-size:9px;font-weight:700;width:24px;text-align:right}
+.tc-status{margin-top:6px;font-family:var(--cond);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;border-radius:3px;display:inline-block}
+.st-flat{background:var(--bg3);color:var(--muted)}
+.st-signal{background:var(--gdim);color:var(--green);border:1px solid var(--green)}
+.st-trade{background:var(--adim);color:var(--aqua);border:1px solid var(--aqua)}
+.st-stop{background:var(--rdim);color:var(--red);border:1px solid var(--red)}
+.sig-dot-card{position:absolute;top:8px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:blink .6s infinite}
+
+/* TRADE */
+.no-trade{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:10px;color:var(--muted);text-align:center;font-size:12px;line-height:2}
+.no-trade .ico{font-size:44px;margin-bottom:8px}
+.trade-block{animation:fadeup .3s ease}
+.trade-hdr-card{background:linear-gradient(135deg,#001828,var(--bg2));border:1px solid var(--aqua);border-radius:10px;padding:12px 14px 10px;margin-bottom:8px}
+.th-top{display:flex;justify-content:space-between;align-items:flex-start}
+.th-sym{font-family:var(--cond);font-size:30px;font-weight:900;color:#fff;letter-spacing:2px;line-height:1}
+.th-leva{font-size:12px;color:var(--orange);margin-left:6px;vertical-align:middle}
+.th-meta{margin-top:6px;display:flex;flex-wrap:wrap;gap:10px}
+.th-meta span{font-size:10px;color:var(--muted)}
+.pnl-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px 12px;text-align:center;margin-bottom:8px;position:relative;overflow:hidden}
+.pnl-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 10px 10px}
+.pnl-card.pos::after{background:var(--green)}.pnl-card.neg::after{background:var(--red)}
+.pnl-pct{font-family:var(--cond);font-size:56px;font-weight:900;line-height:1;letter-spacing:-1px}
+.pnl-eur{font-size:20px;font-weight:700;margin-top:2px}
+.pnl-sub{font-size:10px;color:var(--muted);margin-top:5px}
+.prog-wrap{margin-bottom:8px}
+.prog-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-bottom:4px}
+.prog-track{height:12px;background:var(--rdim);border-radius:6px;overflow:hidden;border:1px solid var(--border)}
+.prog-fill{height:100%;border-radius:6px;transition:width .6s}
+.levels-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.lv-card{border-radius:8px;padding:8px 10px;border:1px solid var(--border)}
+.lv-lbl{font-size:8px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:3px}
+.lv-price{font-size:17px;font-weight:700;letter-spacing:.5px}
+.lv-dist{font-size:9px;color:var(--muted);margin-top:1px}
+.lc-e{background:#06101a;border-color:#1e3050}
+.lc-sl{background:var(--rdim);border-color:var(--red)}
+.lc-tp{background:var(--gdim);border-color:var(--green)}
+.lc-tr{background:rgba(234,128,252,.08);border-color:var(--purple)}
+.action-box{border-radius:10px;border:2px solid;padding:14px 10px;text-align:center;font-family:var(--cond);font-size:18px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.ax-hold{background:var(--adim);border-color:var(--aqua);color:var(--aqua)}
+.ax-tp{background:var(--gdim);border-color:var(--green);color:var(--green)}
+.ax-sl{background:var(--rdim);border-color:var(--red);color:var(--red);animation:blink .8s infinite}
+.ax-trail{background:rgba(234,128,252,.1);border-color:var(--purple);color:var(--purple)}
+.ax-ts{background:var(--rdim);border-color:var(--red);color:var(--red);animation:blink .4s infinite}
+.score-breakdown{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.sb-title{font-family:var(--cond);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--aqua);margin-bottom:8px}
+.sb-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:10px}
+.sb-name{width:70px;color:var(--muted);flex-shrink:0}
+.sb-bar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.sb-fill{height:100%;border-radius:3px;transition:width .5s}
+.sb-val{width:28px;text-align:right;font-weight:700;flex-shrink:0}
+.info-rows{display:flex;flex-direction:column;gap:5px;margin-bottom:8px}
+.ir{display:flex;justify-content:space-between;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:11px}
+.ir .lbl{color:var(--muted)}.ir .val{font-weight:700}
+.close-btn{width:100%;padding:13px;border-radius:8px;background:var(--rdim);border:1px solid var(--red);color:var(--red);font-family:var(--cond);font-size:15px;font-weight:800;letter-spacing:2px;text-transform:uppercase;cursor:pointer;margin-bottom:8px}
+.price-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.price-lbl{font-size:9px;color:var(--muted)}
+.price-inp{background:var(--bg3);border:1px solid var(--aqua);color:var(--aqua);font-family:var(--mono);font-size:16px;font-weight:700;padding:5px 8px;border-radius:6px;width:108px;text-align:center;-webkit-appearance:none;outline:none}
+.price-hint{font-size:8px;color:var(--muted)}
+
+/* SCORE */
+.score-page-grid{display:flex;flex-direction:column;gap:8px}
+.sp-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;animation:fadeup .3s ease both}
+.sp-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.sp-sym{font-family:var(--cond);font-size:20px;font-weight:900;color:#fff;letter-spacing:1px}
+.sp-stars{font-size:11px;color:var(--yellow);margin-top:2px}
+.sp-score{font-family:var(--cond);font-size:22px;font-weight:900}
+.cond-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:6px}
+.cond-pill{text-align:center;padding:3px 4px;border-radius:4px;font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:1px solid}
+.cp-ok{background:var(--gdim);border-color:var(--green);color:var(--green)}
+.cp-no{background:var(--rdim);border-color:var(--red);color:var(--red);opacity:.7}
+
+/* SETUP */
+.setup-section{margin-bottom:16px}
+.setup-title{font-family:var(--cond);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--aqua);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.input-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px}
+.input-row label{font-size:11px;color:var(--text);flex:1}
+.input-row input{background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:6px 8px;border-radius:5px;width:130px;text-align:right;-webkit-appearance:none}
+.input-row input:focus{outline:none;border-color:var(--aqua)}
+.save-btn{width:100%;padding:14px;background:var(--blue);border:none;border-radius:8px;color:#fff;font-family:var(--cond);font-size:15px;font-weight:800;letter-spacing:2px;text-transform:uppercase;cursor:pointer;margin-top:8px}
+.save-btn:active{filter:brightness(.85)}
+.notif-btn{width:100%;padding:10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--cond);font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;margin-top:6px}
+.info-box{margin-top:10px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;font-size:10px;color:var(--muted);line-height:1.7}
+
+/* MODAL */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;align-items:flex-end}
+.modal-backdrop.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 16px 32px;width:100%;animation:fadeup .25s ease}
+.modal-title{font-family:var(--cond);font-size:18px;font-weight:800;color:var(--aqua);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center}
+.modal-close{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer}
+.modal-sub{font-size:10px;color:var(--muted);margin-bottom:14px}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.mf{display:flex;flex-direction:column;gap:4px}
+.mf label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+.mf input{background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:17px;font-weight:700;padding:10px;border-radius:6px;width:100%;text-align:center;-webkit-appearance:none}
+.mf input:focus{outline:none;border-color:var(--aqua)}
+.modal-confirm{width:100%;padding:16px;background:var(--green);border:none;border-radius:8px;color:#000;font-family:var(--cond);font-size:18px;font-weight:900;letter-spacing:2px;cursor:pointer}
+.modal-confirm:active{filter:brightness(.85)}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hdr">
+    <div><div class="hdr-brand">TG Scanner</div><div class="hdr-sub">TRADEGATE · LONG ONLY · SERVERLESS</div></div>
+    <div class="hdr-right"><div class="hdr-time" id="hdrTime">--:--:--</div><span class="kz-pill kz-off" id="kzPill">fuori KZ</span></div>
+  </header>
+  <div class="statusbar" id="statusBar"><div class="sb-item"><div class="sb-dot sb-err"></div><span>Configura API key nel tab ⚙️</span></div></div>
+  <div id="statusMsg"></div>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="scanner">📡 Scanner</button>
+    <button class="tab-btn" data-tab="trade" id="tabTrade">📊 Trade</button>
+    <button class="tab-btn" data-tab="score">⭐ Score</button>
+    <button class="tab-btn" data-tab="setup">⚙️ Setup</button>
+  </nav>
+  <div class="pages">
+
+    <!-- SCANNER -->
+    <div class="page active" id="page-scanner">
+      <div id="signalBanners"></div>
+      <div class="scanner-grid" id="scannerGrid"><div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">Configura API key nel tab ⚙️</div></div>
+      <div class="last-update" id="lastUpdate"></div>
+    </div>
+
+    <!-- TRADE -->
+    <div class="page" id="page-trade"><div id="tradeContent"><div class="no-trade"><div class="ico">📊</div>Nessun trade aperto.</div></div></div>
+
+    <!-- SCORE -->
+    <div class="page" id="page-score"><div class="score-page-grid" id="scorePage"></div></div>
+
+    <!-- SETUP -->
+    <div class="page" id="page-setup">
+      <div class="setup-section">
+        <div class="setup-title">🔑 API Keys</div>
+        <div class="input-row"><label>Twelve Data API Key</label><input type="password" id="cfgTdKey" placeholder="inserisci qui" style="text-align:left;font-size:10px"></div>
+        <div class="input-row"><label>Telegram Bot Token</label><input type="password" id="cfgTgToken" placeholder="123456:ABC..." style="text-align:left;font-size:10px"></div>
+        <div class="input-row"><label>Telegram Chat ID</label><input type="text" id="cfgTgChat" placeholder="987654321" style="text-align:left"></div>
+      </div>
+      <div class="setup-section">
+        <div class="setup-title">💰 Risk Management</div>
+        <div class="input-row"><label>Capitale (€)</label><input type="number" id="cfgCapital" value="10000" inputmode="decimal"></div>
+        <div class="input-row"><label>Rischio per trade (%)</label><input type="number" id="cfgRisk" value="1" step="0.1" inputmode="decimal"></div>
+        <div class="input-row"><label>R:R target</label><input type="number" id="cfgRR" value="2" step="0.1" inputmode="decimal"></div>
+      </div>
+      <div class="setup-section">
+        <div class="setup-title">⏰ KillZones (ora Roma)</div>
+        <div class="input-row"><label>KZ1 London start</label><input type="time" id="cfgKz1s" value="09:00"></div>
+        <div class="input-row"><label>KZ1 London end</label><input type="time" id="cfgKz1e" value="11:00"></div>
+        <div class="input-row"><label>KZ2 NY start</label><input type="time" id="cfgKz2s" value="15:30"></div>
+        <div class="input-row"><label>KZ2 NY end</label><input type="time" id="cfgKz2e" value="17:30"></div>
+        <div class="input-row"><label>Time Stop (chiudi entro)</label><input type="time" id="cfgTs" value="17:30"></div>
+      </div>
+      <div class="setup-section">
+        <div class="setup-title">🔄 Aggiornamento</div>
+        <div class="input-row"><label>Intervallo (secondi)</label><input type="number" id="cfgInterval" value="60" min="60" max="300" inputmode="decimal"></div>
+      </div>
+      <button class="save-btn" id="saveSetupBtn">💾 Salva e Avvia</button>
+      <button class="notif-btn" id="notifBtn">🔔 Attiva notifiche browser</button>
+      <div class="info-box">
+        ℹ️ Tutti i dati restano sul tuo dispositivo.<br>
+        La API key Twelve Data non lascia mai il browser.<br>
+        Tieni questa pagina aperta durante le ore di trading.<br>
+        Su Firefox Android: menu ≡ → <b>Installa</b> per aggiungere alla schermata home.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="modal-title">🟢 Apri Trade — <span id="modalSym"></span><button class="modal-close" id="modalCloseBtn">✕</button></div>
+    <div class="modal-sub">Valori calcolati dallo scoring. Modifica se necessario.</div>
+    <div class="modal-grid">
+      <div class="mf" style="grid-column:1/-1"><label>Entry (€)</label><input type="number" id="mEntry" inputmode="decimal" step="0.0001"></div>
+      <div class="mf"><label>Stop Loss (€)</label><input type="number" id="mSL" inputmode="decimal" step="0.0001"></div>
+      <div class="mf"><label>Take Profit (€)</label><input type="number" id="mTP" inputmode="decimal" step="0.0001"></div>
+      <div class="mf"><label>Score</label><input type="number" id="mScore" inputmode="decimal"></div>
+      <div class="mf"><label>Capitale (€)</label><input type="number" id="mCapital" inputmode="decimal"></div>
+    </div>
+    <button class="modal-confirm" id="modalConfirmBtn">APRI TRADE →</button>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
