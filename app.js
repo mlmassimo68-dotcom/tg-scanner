@@ -107,21 +107,46 @@ async function fetchHistory(tdSym) {
 }
 
 async function fetchBatchQuotes() {
+  // Twelve Data free: batch multi-symbol conta N call (una per ticker)
+  // Soluzione: 1 singola chiamata batch, poi parse individuale
+  // Se 429, fallback a chiamate singole con delay
   const syms = cfg.tickers.map(t => t.td).join(',');
-  const data = await tdGet('/quote', { symbol: syms, dp: 4 });
-  const out = {};
-  for (const tk of cfg.tickers) {
-    const raw = cfg.tickers.length === 1 ? data : data[tk.td];
-    if (!raw || raw.code) { out[tk.sym] = null; continue; }
-    out[tk.sym] = {
-      price:     +raw.close,
-      open:      +raw.open,
-      prevClose: +raw.previous_close,
-      changePct: +raw.percent_change,
-      volume:    +raw.volume||0,
-      high:      +raw.high,
-      low:       +raw.low,
-    };
+  const out  = {};
+  try {
+    const data = await tdGet('/quote', { symbol: syms, dp: 4 });
+    for (const tk of cfg.tickers) {
+      const raw = cfg.tickers.length === 1 ? data : data[tk.td];
+      if (!raw || raw.code) { out[tk.sym] = null; continue; }
+      out[tk.sym] = {
+        price:     +raw.close,
+        open:      +raw.open,
+        prevClose: +raw.previous_close,
+        changePct: +raw.percent_change,
+        volume:    +raw.volume||0,
+        high:      +raw.high,
+        low:       +raw.low,
+      };
+    }
+  } catch(e) {
+    if (e.message.includes('429')) {
+      // Fallback: chiamate singole con pausa 8s
+      setStatus('Rate limit — aggiornamento singolo ticker...');
+      for (const tk of cfg.tickers) {
+        try {
+          const data = await tdGet('/quote', { symbol: tk.td, dp: 4 });
+          out[tk.sym] = {
+            price:     +data.close,
+            open:      +data.open,
+            prevClose: +data.previous_close,
+            changePct: +data.percent_change,
+            volume:    +data.volume||0,
+            high:      +data.high,
+            low:       +data.low,
+          };
+        } catch(e2) { out[tk.sym] = null; }
+        await sleep(8000);
+      }
+    } else { throw e; }
   }
   return out;
 }
@@ -140,19 +165,34 @@ async function tgSend(msg) {
 
 // ══ CICLO PRINCIPALE ════════════════════════════════════════
 async function loadAllHistory() {
-  setStatus('Caricamento storia ticker... (attendi ~90s)');
-  const DELAY = 8500;
-  for (let i = 0; i < cfg.tickers.length; i++) {
+  // Free plan Twelve Data: 8 call/min → pausa 10s tra ogni chiamata
+  const DELAY = 10000;
+  const total = cfg.tickers.length;
+  setStatus(`Caricamento storia ${total} ticker (~${Math.round(total*DELAY/1000)}s)...`);
+  for (let i = 0; i < total; i++) {
     const tk = cfg.tickers[i];
     try {
       const candles = await fetchHistory(tk.td);
-      tickerData[tk.sym] = { candles, quote: null, scoring: null, lastUpdated: null, error: null };
-      setStatus(`Caricato ${tk.sym} (${i+1}/${cfg.tickers.length})...`);
+      tickerData[tk.sym] = { candles, quote:null, scoring:null, lastUpdated:null, error:null };
+      setStatus(`✅ ${tk.sym} (${i+1}/${total}) caricato`);
     } catch(e) {
-      tickerData[tk.sym] = { candles: [], quote: null, scoring: null, lastUpdated: null, error: e.message };
-      setStatus(`⚠️ ${tk.sym}: ${e.message}`);
+      if (e.message.includes('429')) {
+        setStatus(`⏳ Rate limit ${tk.sym}, attendo 35s...`);
+        await sleep(35000);
+        try {
+          const candles = await fetchHistory(tk.td);
+          tickerData[tk.sym] = { candles, quote:null, scoring:null, lastUpdated:null, error:null };
+          setStatus(`✅ ${tk.sym} (${i+1}/${total}) retry ok`);
+        } catch(e2) {
+          tickerData[tk.sym] = { candles:[], quote:null, scoring:null, lastUpdated:null, error:e2.message };
+          setStatus(`⚠️ ${tk.sym}: ${e2.message}`);
+        }
+      } else {
+        tickerData[tk.sym] = { candles:[], quote:null, scoring:null, lastUpdated:null, error:e.message };
+        setStatus(`⚠️ ${tk.sym}: ${e.message}`);
+      }
     }
-    if (i < cfg.tickers.length - 1) await sleep(DELAY);
+    if (i < total - 1) await sleep(DELAY);
   }
 }
 
