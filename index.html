@@ -230,7 +230,8 @@ html,body{height:100%;background:var(--bg0);color:var(--text);font-family:var(--
     <div class="page" id="page-setup">
       <div class="setup-section">
         <div class="setup-title">🔑 API Keys</div>
-        <div class="input-row"><label>Fonte dati</label><span style="color:var(--green);font-size:12px">✅ Yahoo Finance (gratuito, nessuna API key)</span></div>
+        <div class="input-row"><label>Fonte dati</label><span style="color:var(--green);font-size:12px">✅ Yahoo Finance via Cloudflare Worker</span></div>
+        <div class="input-row"><label>Worker URL</label><input type="url" id="cfgWorkerUrl" placeholder="https://tg-scanner.xxx.workers.dev" style="text-align:left;font-size:10px"></div>
         <div class="input-row"><label>Telegram Bot Token</label><input type="password" id="cfgTgToken" placeholder="123456:ABC..." style="text-align:left;font-size:10px"></div>
         <div class="input-row"><label>Telegram Chat ID</label><input type="text" id="cfgTgChat" placeholder="987654321" style="text-align:left"></div>
       </div>

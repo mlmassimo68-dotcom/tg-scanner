@@ -7,6 +7,7 @@ import { computeScore } from './indicators.js';
 
 // ══ CONFIGURAZIONE DEFAULT ═══════════════════════════════════
 const DEFAULT_CFG = {
+  workerUrl:  '',          // Cloudflare Worker URL (proxy Yahoo Finance)
   tgToken:    '',          // Telegram Bot token
   tgChatId:   '',          // Telegram chat_id
   capital:    10000,
@@ -18,8 +19,6 @@ const DEFAULT_CFG = {
   interval: 60,            // secondi tra fetch
   scoreMIn: 60,
   tickers: [
-    { sym:'3QQQ', yf:'3QQQ.DE',  leva:true  },
-    { sym:'US9L', yf:'US9L.DE',  leva:true  },
     { sym:'DBPG', yf:'DBPG.DE',  leva:true  },
     { sym:'LYMZ', yf:'LYMZ.DE',  leva:true  },
     { sym:'3DEL', yf:'3DEL.DE',  leva:true  },
@@ -81,30 +80,23 @@ function kzName()  {
   return null;
 }
 
-// ══ TWELVE DATA FETCH ════════════════════════════════════════
-// ══ YAHOO FINANCE FETCH (no API key, gratuito) ═══════════════
-const YF_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart';
-const YF_BASE2 = 'https://query2.finance.yahoo.com/v8/finance/chart';
+// ══ YAHOO FINANCE FETCH via Cloudflare Worker (proxy CORS) ══
+// Il Worker gira su Cloudflare e bypassa il blocco CORS di Yahoo.
+// Imposta il tuo Worker URL nel tab ⚙️ Setup → Worker URL.
+// Esempio: https://tg-scanner.TUOUSERNAME.workers.dev
 
 async function yfGet(symbol, params = {}) {
-  const url = new URL(`${YF_BASE}/${encodeURIComponent(symbol)}`);
+  const workerUrl = cfg.workerUrl?.trim();
+  if (!workerUrl) throw new Error('Worker URL non configurato — vai in Setup');
+  const url = new URL(workerUrl);
+  url.searchParams.set('symbol', symbol);
   for (const [k,v] of Object.entries(params)) url.searchParams.set(k, v);
-  let res;
-  try {
-    res = await fetch(url.toString(), { signal: AbortSignal.timeout(12000) });
-  } catch(e) {
-    // fallback su query2
-    const url2 = new URL(`${YF_BASE2}/${encodeURIComponent(symbol)}`);
-    for (const [k,v] of Object.entries(params)) url2.searchParams.set(k, v);
-    res = await fetch(url2.toString(), { signal: AbortSignal.timeout(12000) });
-  }
-  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error('Worker HTTP ' + res.status);
   const data = await res.json();
+  if (data.error) throw new Error(`YF: ${data.error}`);
   const result = data?.chart?.result?.[0];
-  if (!result) {
-    const err = data?.chart?.error?.description || 'nessun dato';
-    throw new Error(`YF: ${err}`);
-  }
+  if (!result) throw new Error('YF: nessun dato');
   return result;
 }
 
@@ -575,6 +567,7 @@ document.querySelectorAll('.tab-btn').forEach(b => b.onclick = () => switchTab(b
 
 // ══ SETUP ═════════════════════════════════════════════════════
 function loadSetupUI() {
+  document.getElementById('cfgWorkerUrl').value = cfg.workerUrl;
   document.getElementById('cfgTgToken').value  = cfg.tgToken;
   document.getElementById('cfgTgChat').value   = cfg.tgChatId;
   document.getElementById('cfgCapital').value  = cfg.capital;
@@ -589,6 +582,7 @@ function loadSetupUI() {
 }
 
 document.getElementById('saveSetupBtn').onclick = async () => {
+  cfg.workerUrl = document.getElementById('cfgWorkerUrl').value.trim();
   cfg.tgToken  = document.getElementById('cfgTgToken').value.trim();
   cfg.tgChatId = document.getElementById('cfgTgChat').value.trim();
   cfg.capital  = parseFloat(document.getElementById('cfgCapital').value)||10000;
