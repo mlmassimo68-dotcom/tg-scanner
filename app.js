@@ -7,7 +7,6 @@ import { computeScore } from './indicators.js';
 
 // ══ CONFIGURAZIONE DEFAULT ═══════════════════════════════════
 const DEFAULT_CFG = {
-  tdKey:      '',          // Twelve Data API key
   tgToken:    '',          // Telegram Bot token
   tgChatId:   '',          // Telegram chat_id
   capital:    10000,
@@ -19,16 +18,16 @@ const DEFAULT_CFG = {
   interval: 60,            // secondi tra fetch
   scoreMIn: 60,
   tickers: [
-    { sym:'3QQQ', td:'3QQQ:XETRA', leva:true  },
-    { sym:'US9L', td:'US9L:XETRA', leva:true  },
-    { sym:'DBPG', td:'DBPG:XETRA', leva:true  },
-    { sym:'LYMZ', td:'LYMZ:XETRA', leva:true  },
-    { sym:'3DEL', td:'3DEL:XETRA', leva:true  },
-    { sym:'3WTI', td:'3WTI:XETRA', leva:true  },
-    { sym:'QUTM', td:'QUTM:XETRA', leva:false },
-    { sym:'WIRE', td:'WIRE:XETRA', leva:false },
-    { sym:'HYCN', td:'HYCN:XETRA', leva:false },
-    { sym:'SEC0', td:'SEC0:XETRA', leva:false },
+    { sym:'3QQQ', yf:'3QQQ.DE',  leva:true  },
+    { sym:'US9L', yf:'US9L.DE',  leva:true  },
+    { sym:'DBPG', yf:'DBPG.DE',  leva:true  },
+    { sym:'LYMZ', yf:'LYMZ.DE',  leva:true  },
+    { sym:'3DEL', yf:'3DEL.DE',  leva:true  },
+    { sym:'3WTI', yf:'3WTI.DE',  leva:true  },
+    { sym:'QUTM', yf:'QUTM.DE',  leva:false },
+    { sym:'WIRE', yf:'WIRE.DE',  leva:false },
+    { sym:'HYCN', yf:'HYCN.DE',  leva:false },
+    { sym:'SEC0', yf:'SEC0.DE',  leva:false },
   ],
 };
 
@@ -83,70 +82,80 @@ function kzName()  {
 }
 
 // ══ TWELVE DATA FETCH ════════════════════════════════════════
-const TD_BASE = 'https://api.twelvedata.com';
+// ══ YAHOO FINANCE FETCH (no API key, gratuito) ═══════════════
+const YF_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart';
+const YF_BASE2 = 'https://query2.finance.yahoo.com/v8/finance/chart';
 
-async function tdGet(path, params) {
-  if (!cfg.tdKey) throw new Error('API key mancante — vai in Setup');
-  const url = new URL(TD_BASE + path);
-  url.searchParams.set('apikey', cfg.tdKey);
+async function yfGet(symbol, params = {}) {
+  const url = new URL(`${YF_BASE}/${encodeURIComponent(symbol)}`);
   for (const [k,v] of Object.entries(params)) url.searchParams.set(k, v);
-  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(12000) });
+  let res;
+  try {
+    res = await fetch(url.toString(), { signal: AbortSignal.timeout(12000) });
+  } catch(e) {
+    // fallback su query2
+    const url2 = new URL(`${YF_BASE2}/${encodeURIComponent(symbol)}`);
+    for (const [k,v] of Object.entries(params)) url2.searchParams.set(k, v);
+    res = await fetch(url2.toString(), { signal: AbortSignal.timeout(12000) });
+  }
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const data = await res.json();
-  if (data.code && data.code !== 200) throw new Error(`TD ${data.code}: ${data.message}`);
-  return data;
+  const result = data?.chart?.result?.[0];
+  if (!result) {
+    const err = data?.chart?.error?.description || 'nessun dato';
+    throw new Error(`YF: ${err}`);
+  }
+  return result;
 }
 
-async function fetchHistory(tdSym) {
-  const data = await tdGet('/time_series', { symbol:tdSym, interval:'1day', outputsize:60, order:'ASC', dp:4 });
-  if (!data.values?.length) throw new Error('nessuna serie storica');
-  return data.values.map(v => ({
-    date: v.datetime,
-    open: +v.open, high: +v.high, low: +v.low, close: +v.close, volume: +v.volume||0,
-  }));
+async function fetchHistory(yfSym) {
+  const result = await yfGet(yfSym, { interval:'1d', range:'3mo' });
+  const ts        = result.timestamp;
+  const q         = result.indicators.quote[0];
+  if (!ts?.length) throw new Error('nessuna serie storica');
+  const candles = [];
+  for (let i = 0; i < ts.length; i++) {
+    if (q.close[i] == null) continue;
+    candles.push({
+      date:   new Date(ts[i] * 1000).toISOString().slice(0,10),
+      open:   +q.open[i]   || 0,
+      high:   +q.high[i]   || 0,
+      low:    +q.low[i]    || 0,
+      close:  +q.close[i],
+      volume: +q.volume[i] || 0,
+    });
+  }
+  return candles;
 }
 
 async function fetchBatchQuotes() {
-  // Twelve Data free: batch multi-symbol conta N call (una per ticker)
-  // Soluzione: 1 singola chiamata batch, poi parse individuale
-  // Se 429, fallback a chiamate singole con delay
-  const syms = cfg.tickers.map(t => t.td).join(',');
-  const out  = {};
-  try {
-    const data = await tdGet('/quote', { symbol: syms, dp: 4 });
-    for (const tk of cfg.tickers) {
-      const raw = cfg.tickers.length === 1 ? data : data[tk.td];
-      if (!raw || raw.code) { out[tk.sym] = null; continue; }
+  // Yahoo Finance: chiamate singole per ogni ticker (no batch endpoint)
+  // Nessun rate limit rigido — delay minimo di cortesia 500ms
+  const out = {};
+  for (const tk of cfg.tickers) {
+    try {
+      const result    = await yfGet(tk.yf, { interval:'1d', range:'5d' });
+      const meta      = result.meta;
+      const q         = result.indicators.quote[0];
+      const n         = q.close.length;
+      // Ultimo close disponibile e previous close
+      const closeArr  = q.close.filter(v => v != null);
+      const price     = meta.regularMarketPrice ?? closeArr[closeArr.length-1];
+      const prevClose = meta.chartPreviousClose  ?? closeArr[closeArr.length-2] ?? price;
       out[tk.sym] = {
-        price:     +raw.close,
-        open:      +raw.open,
-        prevClose: +raw.previous_close,
-        changePct: +raw.percent_change,
-        volume:    +raw.volume||0,
-        high:      +raw.high,
-        low:       +raw.low,
+        price,
+        open:      meta.regularMarketOpen       ?? q.open[n-1]   ?? price,
+        prevClose,
+        changePct: prevClose ? (price - prevClose) / prevClose * 100 : 0,
+        volume:    meta.regularMarketVolume      ?? q.volume[n-1] ?? 0,
+        high:      meta.regularMarketDayHigh     ?? q.high[n-1]   ?? price,
+        low:       meta.regularMarketDayLow      ?? q.low[n-1]    ?? price,
       };
+    } catch(e) {
+      console.warn(`YF quote ${tk.yf}:`, e.message);
+      out[tk.sym] = null;
     }
-  } catch(e) {
-    if (e.message.includes('429')) {
-      // Fallback: chiamate singole con pausa 8s
-      setStatus('Rate limit — aggiornamento singolo ticker...');
-      for (const tk of cfg.tickers) {
-        try {
-          const data = await tdGet('/quote', { symbol: tk.td, dp: 4 });
-          out[tk.sym] = {
-            price:     +data.close,
-            open:      +data.open,
-            prevClose: +data.previous_close,
-            changePct: +data.percent_change,
-            volume:    +data.volume||0,
-            high:      +data.high,
-            low:       +data.low,
-          };
-        } catch(e2) { out[tk.sym] = null; }
-        await sleep(8000);
-      }
-    } else { throw e; }
+    await sleep(300); // cortesia verso Yahoo
   }
   return out;
 }
@@ -165,39 +174,26 @@ async function tgSend(msg) {
 
 // ══ CICLO PRINCIPALE ════════════════════════════════════════
 async function loadAllHistory() {
-  // Free plan Twelve Data: 8 call/min → pausa 10s tra ogni chiamata
-  const DELAY = 10000;
+  // Yahoo Finance: nessun rate limit rigido — delay 500ms di cortesia
+  const DELAY = 500;
   const total = cfg.tickers.length;
-  setStatus(`Caricamento storia ${total} ticker (~${Math.round(total*DELAY/1000)}s)...`);
+  setStatus(`Caricamento storia ${total} ticker...`);
   for (let i = 0; i < total; i++) {
     const tk = cfg.tickers[i];
     try {
-      const candles = await fetchHistory(tk.td);
+      const candles = await fetchHistory(tk.yf);
       tickerData[tk.sym] = { candles, quote:null, scoring:null, lastUpdated:null, error:null };
       setStatus(`✅ ${tk.sym} (${i+1}/${total}) caricato`);
     } catch(e) {
-      if (e.message.includes('429')) {
-        setStatus(`⏳ Rate limit ${tk.sym}, attendo 35s...`);
-        await sleep(35000);
-        try {
-          const candles = await fetchHistory(tk.td);
-          tickerData[tk.sym] = { candles, quote:null, scoring:null, lastUpdated:null, error:null };
-          setStatus(`✅ ${tk.sym} (${i+1}/${total}) retry ok`);
-        } catch(e2) {
-          tickerData[tk.sym] = { candles:[], quote:null, scoring:null, lastUpdated:null, error:e2.message };
-          setStatus(`⚠️ ${tk.sym}: ${e2.message}`);
-        }
-      } else {
-        tickerData[tk.sym] = { candles:[], quote:null, scoring:null, lastUpdated:null, error:e.message };
-        setStatus(`⚠️ ${tk.sym}: ${e.message}`);
-      }
+      tickerData[tk.sym] = { candles:[], quote:null, scoring:null, lastUpdated:null, error:e.message };
+      setStatus(`⚠️ ${tk.sym}: ${e.message}`);
     }
     if (i < total - 1) await sleep(DELAY);
   }
 }
 
 async function updateCycle() {
-  if (isLoading || !cfg.tdKey) return;
+  if (isLoading) return;
   isLoading = true;
   try {
     const quotes = await fetchBatchQuotes();
@@ -317,7 +313,6 @@ function renderHeader() {
 
 function renderStatusBar() {
   const bar = document.getElementById('statusBar');
-  if (!cfg.tdKey) { bar.innerHTML='<div class="sb-item"><div class="sb-dot sb-err"></div><span>Inserisci API key nel tab ⚙️ Setup</span></div>'; return; }
   bar.innerHTML = cfg.tickers.map(tk => {
     const td = tickerData[tk.sym];
     const cls = trades[tk.sym] ? 'sb-trade' : td?.scoring?.isSignal ? 'sb-sig' : td?.error ? 'sb-err' : 'sb-ok';
@@ -580,7 +575,6 @@ document.querySelectorAll('.tab-btn').forEach(b => b.onclick = () => switchTab(b
 
 // ══ SETUP ═════════════════════════════════════════════════════
 function loadSetupUI() {
-  document.getElementById('cfgTdKey').value    = cfg.tdKey;
   document.getElementById('cfgTgToken').value  = cfg.tgToken;
   document.getElementById('cfgTgChat').value   = cfg.tgChatId;
   document.getElementById('cfgCapital').value  = cfg.capital;
@@ -595,7 +589,6 @@ function loadSetupUI() {
 }
 
 document.getElementById('saveSetupBtn').onclick = async () => {
-  cfg.tdKey    = document.getElementById('cfgTdKey').value.trim();
   cfg.tgToken  = document.getElementById('cfgTgToken').value.trim();
   cfg.tgChatId = document.getElementById('cfgTgChat').value.trim();
   cfg.capital  = parseFloat(document.getElementById('cfgCapital').value)||10000;
@@ -623,6 +616,47 @@ document.getElementById('notifBtn')?.addEventListener('click', async () => {
   document.getElementById('notifBtn').textContent = p==='granted' ? '✅ Notifiche attive' : '❌ Permesso negato';
 });
 
+// ── Export config ──────────────────────────────────────────────
+document.getElementById('exportCfgBtn')?.addEventListener('click', () => {
+  const payload = JSON.stringify({ cfg, trades }, null, 2);
+  const blob    = new Blob([payload], { type: 'application/json' });
+  const url     = URL.createObjectURL(blob);
+  const a       = document.createElement('a');
+  const date    = new Date().toISOString().slice(0,10);
+  a.href        = url;
+  a.download    = `tgscanner-config-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ── Import config ──────────────────────────────────────────────
+document.getElementById('importCfgFile')?.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const d    = JSON.parse(text);
+    if (d?.cfg) {
+      cfg    = { ...DEFAULT_CFG, ...d.cfg, tickers: d.cfg.tickers || DEFAULT_CFG.tickers };
+      trades = d.trades || {};
+      saveState();
+      loadSetupUI();
+      startLoop();
+      tickerData = {};
+      await loadAllHistory();
+      await updateCycle();
+      document.getElementById('importCfgLbl').textContent = '✅ Config importata!';
+      setTimeout(() => document.getElementById('importCfgLbl').innerHTML =
+        '📂 Importa config<input type="file" id="importCfgFile" accept=".json" style="display:none">', 2000);
+    } else {
+      alert('File non valido: struttura cfg mancante.');
+    }
+  } catch(err) {
+    alert('Errore importazione: ' + err.message);
+  }
+  e.target.value = '';
+});
+
 // ══ INIT ══════════════════════════════════════════════════════
 loadState();
 loadSetupUI();
@@ -633,13 +667,9 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(()=>{});
 }
 
-// Avvio automatico se API key già configurata
-if (cfg.tdKey) {
-  setStatus('Avvio scanner...');
-  loadAllHistory().then(() => {
-    updateCycle();
-    setStatus('');
-  });
-} else {
-  setStatus('👆 Inserisci la tua Twelve Data API key nel tab ⚙️ Setup per iniziare');
-}
+// Avvio automatico
+setStatus('Avvio scanner...');
+loadAllHistory().then(() => {
+  updateCycle();
+  setStatus('');
+});

@@ -203,7 +203,7 @@ html,body{height:100%;background:var(--bg0);color:var(--text);font-family:var(--
     <div><div class="hdr-brand">TG Scanner</div><div class="hdr-sub">TRADEGATE · LONG ONLY · SERVERLESS</div></div>
     <div class="hdr-right"><div class="hdr-time" id="hdrTime">--:--:--</div><span class="kz-pill kz-off" id="kzPill">fuori KZ</span></div>
   </header>
-  <div class="statusbar" id="statusBar"><div class="sb-item"><div class="sb-dot sb-err"></div><span>Configura API key nel tab ⚙️</span></div></div>
+  <div class="statusbar" id="statusBar"><div class="sb-item"><div class="sb-dot sb-ok"></div><span>Avvio in corso...</span></div></div>
   <div id="statusMsg"></div>
   <nav class="tabs">
     <button class="tab-btn active" data-tab="scanner">📡 Scanner</button>
@@ -216,7 +216,7 @@ html,body{height:100%;background:var(--bg0);color:var(--text);font-family:var(--
     <!-- SCANNER -->
     <div class="page active" id="page-scanner">
       <div id="signalBanners"></div>
-      <div class="scanner-grid" id="scannerGrid"><div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">Configura API key nel tab ⚙️</div></div>
+      <div class="scanner-grid" id="scannerGrid"><div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">Caricamento ticker...</div></div>
       <div class="last-update" id="lastUpdate"></div>
     </div>
 
@@ -230,7 +230,7 @@ html,body{height:100%;background:var(--bg0);color:var(--text);font-family:var(--
     <div class="page" id="page-setup">
       <div class="setup-section">
         <div class="setup-title">🔑 API Keys</div>
-        <div class="input-row"><label>Twelve Data API Key</label><input type="password" id="cfgTdKey" placeholder="inserisci qui" style="text-align:left;font-size:10px"></div>
+        <div class="input-row"><label>Fonte dati</label><span style="color:var(--green);font-size:12px">✅ Yahoo Finance (gratuito, nessuna API key)</span></div>
         <div class="input-row"><label>Telegram Bot Token</label><input type="password" id="cfgTgToken" placeholder="123456:ABC..." style="text-align:left;font-size:10px"></div>
         <div class="input-row"><label>Telegram Chat ID</label><input type="text" id="cfgTgChat" placeholder="987654321" style="text-align:left"></div>
       </div>
@@ -254,9 +254,16 @@ html,body{height:100%;background:var(--bg0);color:var(--text);font-family:var(--
       </div>
       <button class="save-btn" id="saveSetupBtn">💾 Salva e Avvia</button>
       <button class="notif-btn" id="notifBtn">🔔 Attiva notifiche browser</button>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button class="notif-btn" id="exportCfgBtn" style="flex:1">📋 Esporta config</button>
+        <label class="notif-btn" id="importCfgLbl" style="flex:1;text-align:center;cursor:pointer">
+          📂 Importa config
+          <input type="file" id="importCfgFile" accept=".json" style="display:none">
+        </label>
+      </div>
       <div class="info-box">
         ℹ️ Tutti i dati restano sul tuo dispositivo.<br>
-        La API key Twelve Data non lascia mai il browser.<br>
+        I prezzi provengono da Yahoo Finance (gratuito, ritardo ~15min).<br>
         Tieni questa pagina aperta durante le ore di trading.<br>
         Su Firefox Android: menu ≡ → <b>Installa</b> per aggiungere alla schermata home.
       </div>
