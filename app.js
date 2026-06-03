@@ -610,18 +610,46 @@ document.getElementById('notifBtn')?.addEventListener('click', async () => {
 });
 
 // ── Export config ──────────────────────────────────────────────
-document.getElementById('exportCfgBtn')?.addEventListener('click', () => {
+document.getElementById('exportCfgBtn')?.addEventListener('click', async () => {
   const payload = JSON.stringify({ cfg, trades }, null, 2);
   const date    = new Date().toISOString().slice(0,10);
-  // data URI: funziona su tutti i browser inclusi PWA e mobile
-  const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(payload);
-  const a       = document.createElement('a');
-  a.href        = dataUri;
-  a.download    = `tgscanner-config-${date}.json`;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const btn     = document.getElementById('exportCfgBtn');
+
+  // Tentativo 1: download via data URI
+  try {
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(payload);
+    const a       = document.createElement('a');
+    a.href        = dataUri;
+    a.download    = `tgscanner-config-${date}.json`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch(e) {}
+
+  // Tentativo 2: copia negli appunti
+  try {
+    await navigator.clipboard.writeText(payload);
+    btn.textContent = '✅ Copiato negli appunti!';
+    setTimeout(() => btn.textContent = '📋 Esporta config', 3000);
+    return;
+  } catch(e) {}
+
+  // Fallback: mostra textarea con il JSON da copiare manualmente
+  let ta = document.getElementById('exportFallbackArea');
+  if (!ta) {
+    ta = document.createElement('textarea');
+    ta.id = 'exportFallbackArea';
+    ta.rows = 6;
+    ta.style.cssText = 'width:100%;margin-top:8px;font-size:10px;background:#1a1a2e;color:#00ff88;border:1px solid #333;border-radius:6px;padding:8px;box-sizing:border-box;resize:vertical';
+    ta.readOnly = true;
+    btn.parentElement.after(ta);
+  }
+  ta.value = payload;
+  ta.style.display = 'block';
+  ta.select();
+  btn.textContent = '📋 Copia il testo qui sotto';
+  setTimeout(() => btn.textContent = '📋 Esporta config', 5000);
 });
 
 // ── Import config ──────────────────────────────────────────────
