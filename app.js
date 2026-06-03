@@ -22,7 +22,6 @@ const DEFAULT_CFG = {
     { sym:'DBPG', yf:'DBPG.DE',  leva:true  },
     { sym:'LYMZ', yf:'LYMZ.DE',  leva:true  },
     { sym:'3DEL', yf:'3DEL.DE',  leva:true  },
-    { sym:'3WTI', yf:'3WTI.DE',  leva:true  },
     { sym:'QUTM', yf:'QUTM.DE',  leva:false },
     { sym:'WIRE', yf:'WIRE.DE',  leva:false },
     { sym:'HYCN', yf:'HYCN.DE',  leva:false },
@@ -54,7 +53,7 @@ function saveState() {
 function loadState() {
   try {
     const d = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-    if (d?.cfg)    cfg    = { ...DEFAULT_CFG, ...d.cfg, tickers: d.cfg.tickers || DEFAULT_CFG.tickers };
+    if (d?.cfg)    cfg    = { ...DEFAULT_CFG, ...d.cfg, tickers: DEFAULT_CFG.tickers }; // ticker sempre da DEFAULT_CFG
     if (d?.trades) trades = d.trades;
   } catch(e) {}
 }
@@ -613,14 +612,16 @@ document.getElementById('notifBtn')?.addEventListener('click', async () => {
 // ── Export config ──────────────────────────────────────────────
 document.getElementById('exportCfgBtn')?.addEventListener('click', () => {
   const payload = JSON.stringify({ cfg, trades }, null, 2);
-  const blob    = new Blob([payload], { type: 'application/json' });
-  const url     = URL.createObjectURL(blob);
-  const a       = document.createElement('a');
   const date    = new Date().toISOString().slice(0,10);
-  a.href        = url;
+  // data URI: funziona su tutti i browser inclusi PWA e mobile
+  const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(payload);
+  const a       = document.createElement('a');
+  a.href        = dataUri;
   a.download    = `tgscanner-config-${date}.json`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
 });
 
 // ── Import config ──────────────────────────────────────────────
@@ -631,7 +632,7 @@ document.getElementById('importCfgFile')?.addEventListener('change', async (e) =
     const text = await file.text();
     const d    = JSON.parse(text);
     if (d?.cfg) {
-      cfg    = { ...DEFAULT_CFG, ...d.cfg, tickers: d.cfg.tickers || DEFAULT_CFG.tickers };
+      cfg    = { ...DEFAULT_CFG, ...d.cfg, tickers: DEFAULT_CFG.tickers }; // ticker sempre da DEFAULT_CFG
       trades = d.trades || {};
       saveState();
       loadSetupUI();
