@@ -41,8 +41,9 @@ const LS_KEY = 'tgscanner_sl_v1';
 // ══ STATO GLOBALE ════════════════════════════════════════════
 let cfg       = { ...DEFAULT_CFG };
 let tickerData = {};   // sym → { candles, quote, scoring, lastUpdated }
-let trades     = {};   // sym → trade aperto
-let prevSignals = {};  // sym → bool (per rilevare nuovi segnali)
+let trades       = {};   // sym → trade aperto
+let tradeHistory = [];   // storico trade chiusi
+let prevSignals  = {};   // sym → bool (per rilevare nuovi segnali)
 let refreshTimer = null;
 let isLoading   = false;
 
