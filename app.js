@@ -48,13 +48,14 @@ let isLoading   = false;
 
 // ══ PERSISTENZA ══════════════════════════════════════════════
 function saveState() {
-  try { localStorage.setItem(LS_KEY, JSON.stringify({ cfg, trades })); } catch(e) {}
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ cfg, trades, tradeHistory })); } catch(e) {}
 }
 function loadState() {
   try {
     const d = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
     if (d?.cfg)    cfg    = { ...DEFAULT_CFG, ...d.cfg, tickers: DEFAULT_CFG.tickers }; // ticker sempre da DEFAULT_CFG
     if (d?.trades) trades = d.trades;
+    if (d?.tradeHistory) tradeHistory = d.tradeHistory;
   } catch(e) {}
 }
 
@@ -283,6 +284,7 @@ function posSize(entry, sl) {
 
 // ══ RENDER ════════════════════════════════════════════════════
 function renderAll() {
+  renderHistory();
   renderHeader();
   renderStatusBar();
   const active = document.querySelector('.tab-btn.active')?.dataset?.tab;
@@ -535,16 +537,37 @@ document.getElementById('modalConfirmBtn').onclick = async () => {
   await tgSend(`📊 <b>TRADE APERTO — ${modalSym}</b>\nEntry <code>${entry}</code> · SL <code>${sl}</code> · TP <code>${tp}</code>\n${Math.round(posSize(entry,sl))} quote · Rischio max ${(cfg.capital*cfg.risk/100).toFixed(2)}€`);
 };
 
-window.closeTrade = async function(sym) {
-  if (!confirm(`Chiudere trade ${sym}?`)) return;
-  const tr  = trades[sym];
-  const cur = tickerData[sym]?.quote?.price ?? tr.entry;
-  const pct = (cur - tr.entry) / tr.entry * 100;
-  const eur = posSize(tr.entry, tr.sl) * (cur - tr.entry);
-  await tgSend(`${pct>=0?'✅':'❌'} <b>TRADE CHIUSO — ${sym}</b>\nEntry ${tr.entry.toFixed(4)} → Exit ${cur.toFixed(4)}\nP&L <b>${sign(pct)}${pct.toFixed(2)}%</b> (${sign(eur)}${eur.toFixed(2)}€)`);
+window.closeTrade = async function(sym, reason) {
+  if (!reason && !confirm(`Chiudere trade ${sym}?`)) return;
+  const tr    = trades[sym];
+  const cur   = tickerData[sym]?.quote?.price ?? tr.entry;
+  const pct   = (cur - tr.entry) / tr.entry * 100;
+  const eur   = posSize(tr.entry, tr.sl) * (cur - tr.entry);
+  const dur   = Math.round((Date.now() - tr.openTime) / 60000);
+  const why   = reason || (cur >= tr.tp ? 'TP' : cur <= tr.sl ? 'SL' : isTS() ? 'TimeStop' : 'Manuale');
+
+  // Salva nello storico
+  tradeHistory.unshift({
+    date:    new Date().toISOString(),
+    sym,
+    entry:   tr.entry,
+    exit:    cur,
+    sl:      tr.sl,
+    tp:      tr.tp,
+    pct:     Math.round(pct * 100) / 100,
+    eur:     Math.round(eur * 100) / 100,
+    dur,
+    reason:  why,
+    score:   tr.score || 0,
+  });
+  // Mantieni max 200 record
+  if (tradeHistory.length > 200) tradeHistory = tradeHistory.slice(0, 200);
+
+  await tgSend(`${pct>=0?'✅':'❌'} <b>TRADE CHIUSO — ${sym}</b>\nEntry ${tr.entry.toFixed(4)} → Exit ${cur.toFixed(4)}\nP&L <b>${sign(pct)}${pct.toFixed(2)}%</b> (${sign(eur)}${eur.toFixed(2)}€)\nMotivo: ${why} · Durata: ${dur}min`);
   delete trades[sym];
   saveState();
   renderAll();
+  renderHistory();
 };
 
 window.updatePrice = function(sym, val) {
@@ -611,7 +634,7 @@ document.getElementById('notifBtn')?.addEventListener('click', async () => {
 
 // ── Export config ──────────────────────────────────────────────
 document.getElementById('exportCfgBtn')?.addEventListener('click', async () => {
-  const payload = JSON.stringify({ cfg, trades }, null, 2);
+  const payload = JSON.stringify({ cfg, trades, tradeHistory }, null, 2);
   const date    = new Date().toISOString().slice(0,10);
   const btn     = document.getElementById('exportCfgBtn');
 
@@ -681,6 +704,91 @@ document.getElementById('importCfgFile')?.addEventListener('change', async (e) =
 });
 
 // ══ INIT ══════════════════════════════════════════════════════
+// ══ STORICO TRADE ════════════════════════════════════════════
+function renderHistory() {
+  const el = document.getElementById('historyContent');
+  if (!el) return;
+  if (!tradeHistory.length) {
+    el.innerHTML = '<div class="no-trade"><div class="ico">📋</div>Nessun trade chiuso ancora.</div>';
+    return;
+  }
+
+  // Statistiche aggregate
+  const wins   = tradeHistory.filter(t => t.pct > 0);
+  const losses = tradeHistory.filter(t => t.pct <= 0);
+  const totEur = tradeHistory.reduce((s, t) => s + t.eur, 0);
+  const avgPct = tradeHistory.reduce((s, t) => s + t.pct, 0) / tradeHistory.length;
+  const winRate = tradeHistory.length ? Math.round(wins.length / tradeHistory.length * 100) : 0;
+
+  const statColor = v => v >= 0 ? 'var(--green)' : 'var(--red)';
+
+  const statsHtml = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">
+      <div style="background:var(--bg2);border-radius:8px;padding:8px;text-align:center">
+        <div style="font-size:9px;color:var(--muted);letter-spacing:1px">TRADE</div>
+        <div style="font-size:18px;font-weight:900;color:var(--aqua)">${tradeHistory.length}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:8px;text-align:center">
+        <div style="font-size:9px;color:var(--muted);letter-spacing:1px">WIN RATE</div>
+        <div style="font-size:18px;font-weight:900;color:${statColor(winRate-50)}">${winRate}%</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:8px;text-align:center">
+        <div style="font-size:9px;color:var(--muted);letter-spacing:1px">P&L MEDIO</div>
+        <div style="font-size:18px;font-weight:900;color:${statColor(avgPct)}">${avgPct>=0?'+':''}${avgPct.toFixed(2)}%</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:8px;text-align:center">
+        <div style="font-size:9px;color:var(--muted);letter-spacing:1px">P&L TOT</div>
+        <div style="font-size:18px;font-weight:900;color:${statColor(totEur)}">${totEur>=0?'+':''}${totEur.toFixed(0)}€</div>
+      </div>
+    </div>`;
+
+  const rows = tradeHistory.map(t => {
+    const d    = new Date(t.date);
+    const dt   = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    const col  = t.pct > 0 ? 'var(--green)' : 'var(--red)';
+    const ico  = t.reason==='TP' ? '✅' : t.reason==='SL' ? '❌' : t.reason==='TimeStop' ? '⏰' : '🔄';
+    return `<div style="background:var(--bg2);border-radius:8px;padding:8px 10px;margin-bottom:6px;display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center">
+      <div style="font-family:var(--cond);font-weight:900;font-size:14px;color:var(--aqua)">${t.sym}</div>
+      <div>
+        <div style="font-size:9px;color:var(--muted)">${dt} · ${t.dur}min · ${ico} ${t.reason}</div>
+        <div style="font-size:10px;color:var(--text)">${t.entry.toFixed(4)} → ${t.exit.toFixed(4)}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:900;font-size:14px;color:${col}">${t.pct>=0?'+':''}${t.pct.toFixed(2)}%</div>
+        <div style="font-size:10px;color:${col}">${t.eur>=0?'+':''}${t.eur.toFixed(2)}€</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = statsHtml + rows;
+}
+
+window.exportHistory = function() {
+  if (!tradeHistory.length) { alert('Nessun trade nello storico.'); return; }
+  const headers = ['Data','Ticker','Entry','Exit','SL','TP','P&L%','P&L€','Durata(min)','Motivo','Score'];
+  const rows = tradeHistory.map(t => [
+    new Date(t.date).toLocaleString('it-IT'),
+    t.sym, t.entry, t.exit, t.sl, t.tp,
+    t.pct, t.eur, t.dur, t.reason, t.score
+  ].join(';'));
+  const csv = [headers.join(';'), ...rows].join('\n');
+  const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  const a = document.createElement('a');
+  a.href = dataUri;
+  a.download = `tgscanner-storico-${new Date().toISOString().slice(0,10)}.csv`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
+
+window.clearHistory = function() {
+  if (!confirm('Cancellare tutto lo storico? Non è reversibile.')) return;
+  tradeHistory = [];
+  saveState();
+  renderHistory();
+};
+
 loadState();
 loadSetupUI();
 setInterval(renderHeader, 1000);
@@ -695,4 +803,5 @@ setStatus('Avvio scanner...');
 loadAllHistory().then(() => {
   updateCycle();
   setStatus('');
+  renderHistory();
 });

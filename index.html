@@ -52,7 +52,7 @@ html,body{height:100%;background:var(--bg0);color:var(--text);font-family:var(--
 #statusMsg{flex-shrink:0;font-size:10px;color:var(--yellow);padding:3px 14px;background:var(--bg1);border-bottom:1px solid var(--border);min-height:20px;letter-spacing:.5px}
 
 /* TABS */
-.tabs{flex-shrink:0;display:grid;grid-template-columns:repeat(4,1fr);background:var(--bg1);border-bottom:1px solid var(--border)}
+.tabs{flex-shrink:0;display:grid;grid-template-columns:repeat(5,1fr);background:var(--bg1);border-bottom:1px solid var(--border)}
 .tab-btn{padding:9px 4px 8px;text-align:center;font-family:var(--cond);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border:none;background:none;border-bottom:2px solid transparent;cursor:pointer;transition:color .15s,border-color .15s;position:relative}
 .tab-btn.active{color:var(--aqua);border-bottom-color:var(--aqua)}
 .tab-badge{position:absolute;top:5px;right:8px;background:var(--red);color:#fff;font-size:8px;font-weight:900;width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--cond)}
@@ -210,6 +210,7 @@ html,body{height:100%;background:var(--bg0);color:var(--text);font-family:var(--
     <button class="tab-btn" data-tab="trade" id="tabTrade">📊 Trade</button>
     <button class="tab-btn" data-tab="score">⭐ Score</button>
     <button class="tab-btn" data-tab="setup">⚙️ Setup</button>
+    <button class="tab-btn" data-tab="history">📋 Storico</button>
   </nav>
   <div class="pages">
 
@@ -227,6 +228,13 @@ html,body{height:100%;background:var(--bg0);color:var(--text);font-family:var(--
     <div class="page" id="page-score"><div class="score-page-grid" id="scorePage"></div></div>
 
     <!-- SETUP -->
+    <div class="page" id="page-history">
+      <div id="historyContent"><div class="no-trade"><div class="ico">📋</div>Nessun trade chiuso ancora.</div></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="notif-btn" style="flex:1" onclick="exportHistory()">📥 Esporta CSV</button>
+        <button class="notif-btn" style="flex:1;color:var(--red)" onclick="clearHistory()">🗑️ Cancella storico</button>
+      </div>
+    </div>
     <div class="page" id="page-setup">
       <div class="setup-section">
         <div class="setup-title">🔑 API Keys</div>
