@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0e1a">
+<title>TG Daily Scanner</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700&display=swap');
+
+  :root {
+    --bg:        #0a0e1a;
+    --bg2:       #0f1525;
+    --bg3:       #161d30;
+    --border:    #1e2a42;
+    --accent:    #00e5ff;
+    --green:     #00ff88;
+    --red:       #ff3d5a;
+    --yellow:    #ffd600;
+    --dim:       #4a5568;
+    --text:      #e2e8f0;
+    --textdim:   #718096;
+    --mono:      'Space Mono', monospace;
+    --sans:      'Barlow Condensed', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--textdim); }
+  .clock {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--textdim);
+  }
+  .session-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 3px;
+    letter-spacing: 1px;
+    font-family: var(--mono);
+  }
+  .session-london { background: #1a3a2a; color: var(--green); border: 1px solid var(--green); }
+  .session-ny     { background: #3a1a1a; color: var(--yellow); border: 1px solid var(--yellow); }
+  .session-closed { background: #1a1a2a; color: var(--dim);    border: 1px solid var(--dim); }
+
+  /* ── SCAN BUTTON ── */
+  .scan-bar {
+    padding: 12px 16px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+  }
+  .btn-scan {
+    flex: 1;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 4px;
+    padding: 10px;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: opacity .2s;
+  }
+  .btn-scan:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-scan:not(:disabled):active { opacity: .7; }
+
+  .progress-bar {
+    height: 2px;
+    background: var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width .3s;
+  }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--textdim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+    font-family: var(--mono);
+    text-transform: uppercase;
+  }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* ── CONTENT ── */
+  .content { padding: 12px 12px 80px; }
+
+  /* ── SIGNAL CARD ── */
+  .signal-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    animation: slideIn .3s ease;
+  }
+  @keyframes slideIn {
+    from { opacity:0; transform: translateY(8px); }
+    to   { opacity:1; transform: translateY(0); }
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-left { display: flex; align-items: center; gap: 10px; }
+  .rank {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--dim);
+    min-width: 24px;
+  }
+  .rank.r1 { color: var(--yellow); }
+  .rank.r2 { color: var(--textdim); }
+  .rank.r3 { color: #8b6914; }
+
+  .ticker {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .ticker-name {
+    font-size: 11px;
+    color: var(--textdim);
+    margin-top: 1px;
+    font-family: var(--sans);
+  }
+
+  .score-badge {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .score-high   { color: var(--green); }
+  .score-mid    { color: var(--yellow); }
+  .score-low    { color: var(--red); }
+
+  /* signal type pill */
+  .signal-type {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 3px;
+    letter-spacing: 1px;
+    font-family: var(--mono);
+  }
+  .sig-momentum { background: #0a2a1a; color: var(--green); border: 1px solid var(--green); }
+  .sig-pullback { background: #2a2a0a; color: var(--yellow); border: 1px solid var(--yellow); }
+  .sig-breakout { background: #0a1a2a; color: var(--accent); border: 1px solid var(--accent); }
+  .sig-watch    { background: #1a1a1a; color: var(--dim);    border: 1px solid var(--dim); }
+
+  /* card body */
+  .card-body { padding: 10px 12px; }
+
+  .price-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .price-current {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 700;
+  }
+  .price-change {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .up   { color: var(--green); }
+  .down { color: var(--red); }
+  .flat { color: var(--textdim); }
+
+  /* levels grid */
+  .levels {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .level-box {
+    background: var(--bg3);
+    border-radius: 4px;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .level-label {
+    font-size: 9px;
+    color: var(--textdim);
+    letter-spacing: 1px;
+    font-family: var(--mono);
+    text-transform: uppercase;
+  }
+  .level-value {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+  .lv-entry { color: var(--accent); }
+  .lv-target { color: var(--green); }
+  .lv-stop   { color: var(--red); }
+
+  /* indicators row */
+  .indicators {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .ind-pill {
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--bg3);
+    color: var(--textdim);
+    border: 1px solid var(--border);
+  }
+  .ind-ok  { color: var(--green); border-color: #1a3a2a; }
+  .ind-warn { color: var(--yellow); border-color: #3a3a1a; }
+  .ind-bad { color: var(--red); border-color: #3a1a1a; }
+
+  /* ── VOLUME BAR ── */
+  .vol-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .vol-label { font-size: 10px; color: var(--textdim); font-family: var(--mono); min-width: 28px; }
+  .vol-bar-bg {
+    flex: 1;
+    height: 4px;
+    background: var(--bg3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .vol-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+    transition: width .5s;
+  }
+  .vol-value { font-size: 10px; color: var(--textdim); font-family: var(--mono); min-width: 40px; text-align: right; }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--textdim);
+  }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .empty-sub { font-size: 13px; line-height: 1.5; }
+
+  /* ── STATUS LOG ── */
+  .status-log {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--textdim);
+    max-height: 120px;
+    overflow-y: auto;
+    line-height: 1.8;
+  }
+  .log-ok   { color: var(--green); }
+  .log-err  { color: var(--red); }
+  .log-info { color: var(--accent); }
+
+  /* ── WATCHLIST VIEW ── */
+  .wl-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    margin-bottom: 6px;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  .wl-sym { color: var(--text); font-weight: 700; }
+  .wl-name { font-size: 10px; color: var(--textdim); font-family: var(--sans); margin-top: 1px; }
+  .wl-price { text-align: right; }
+  .wl-chg { font-size: 11px; }
+
+  /* ── SETTINGS VIEW ── */
+  .settings-group {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .settings-title {
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--textdim);
+    background: var(--bg3);
+    font-family: var(--mono);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-label { font-size: 13px; color: var(--text); }
+  .settings-value { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+
+  /* toggle */
+  .toggle { position: relative; width: 38px; height: 20px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .toggle-slider:before {
+    content: '';
+    position: absolute;
+    width: 14px; height: 14px;
+    left: 2px; top: 2px;
+    background: var(--textdim);
+    border-radius: 50%;
+    transition: all .2s;
+  }
+  .toggle input:checked + .toggle-slider { background: var(--accent); border-color: var(--accent); }
+  .toggle input:checked + .toggle-slider:before {
+    left: 20px;
+    background: var(--bg);
+  }
+
+  /* ── SPINNER ── */
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── BOTTOM NAV ── */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    display: flex;
+    z-index: 100;
+  }
+  .nav-item {
+    flex: 1;
+    padding: 10px 0 8px;
+    text-align: center;
+    cursor: pointer;
+    color: var(--textdim);
+    font-size: 10px;
+    font-family: var(--mono);
+    letter-spacing: .5px;
+    transition: color .2s;
+  }
+  .nav-item.active { color: var(--accent); }
+  .nav-icon { font-size: 18px; display: block; margin-bottom: 2px; }
+
+  /* ── R/R INDICATOR ── */
+  .rr-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .rr-label { font-size: 9px; font-family: var(--mono); color: var(--textdim); min-width: 22px; }
+  .rr-track {
+    flex: 1;
+    height: 6px;
+    background: var(--bg3);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+  }
+  .rr-gain { position: absolute; left: 0; top: 0; height: 100%; background: var(--green); border-radius: 3px; }
+  .rr-loss { position: absolute; right: 0; top: 0; height: 100%; background: var(--red); border-radius: 3px; }
+  .rr-value { font-size: 10px; font-family: var(--mono); color: var(--text); min-width: 32px; text-align: right; }
+
+  /* ── SECTION HEADER ── */
+  .section-hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    margin-top: 4px;
+  }
+  .section-hdr h3 {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--textdim);
+    font-family: var(--mono);
+    text-transform: uppercase;
+  }
+  .section-hdr span {
+    font-size: 10px;
+    color: var(--dim);
+    font-family: var(--mono);
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">TG<span>/</span>SCANNER</div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span class="session-badge session-closed" id="sessionBadge">CLOSED</span>
+    <span class="clock" id="clock">--:--:--</span>
+  </div>
+</header>
+
+<!-- SCAN BAR -->
+<div class="scan-bar">
+  <button class="btn-scan" id="btnScan" onclick="runScan()">⚡ AVVIA SCAN</button>
+  <div style="font-family:var(--mono);font-size:11px;color:var(--textdim);white-space:nowrap;" id="lastScanTime">mai</div>
+</div>
+<div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="showTab('signals')" id="tab-signals">SEGNALI</div>
+  <div class="tab" onclick="showTab('watchlist')" id="tab-watchlist">LISTA</div>
+  <div class="tab" onclick="showTab('log')" id="tab-log">LOG</div>
+  <div class="tab" onclick="showTab('settings')" id="tab-settings">⚙</div>
+</div>
+
+<!-- CONTENT AREAS -->
+<div class="content" id="view-signals">
+  <div class="empty-state" id="emptySignals">
+    <div class="empty-icon">📡</div>
+    <div class="empty-title">Nessuna scansione</div>
+    <div class="empty-sub">Premi AVVIA SCAN per analizzare<br>i ticker dalla lista Tradegate</div>
+  </div>
+  <div id="signalCards"></div>
+</div>
+
+<div class="content" id="view-watchlist" style="display:none">
+  <div id="watchlistRows"></div>
+</div>
+
+<div class="content" id="view-log" style="display:none">
+  <div class="status-log" id="logArea">Pronto.<br></div>
+</div>
+
+<div class="content" id="view-settings" style="display:none">
+  <div class="settings-group">
+    <div class="settings-title">Parametri Segnale</div>
+    <div class="settings-row">
+      <span class="settings-label">EMA veloce</span>
+      <span class="settings-value" id="set-ema-fast">9</span>
+    </div>
+    <div class="settings-row">
+      <span class="settings-label">EMA lenta</span>
+      <span class="settings-value" id="set-ema-slow">21</span>
+    </div>
+    <div class="settings-row">
+      <span class="settings-label">Timeframe primario</span>
+      <span class="settings-value">1h</span>
+    </div>
+    <div class="settings-row">
+      <span class="settings-label">Timeframe conferma</span>
+      <span class="settings-value">15m</span>
+    </div>
+    <div class="settings-row">
+      <span class="settings-label">Score minimo entrata</span>
+      <span class="settings-value">6/10</span>
+    </div>
+  </div>
+  <div class="settings-group">
+    <div class="settings-title">Filtri</div>
+    <div class="settings-row">
+      <span class="settings-label">Solo sessione attiva</span>
+      <label class="toggle"><input type="checkbox" id="tog-session" checked><span class="toggle-slider"></span></label>
+    </div>
+    <div class="settings-row">
+      <span class="settings-label">Includi leveraged 3x</span>
+      <label class="toggle"><input type="checkbox" id="tog-lev" checked><span class="toggle-slider"></span></label>
+    </div>
+    <div class="settings-row">
+      <span class="settings-label">Auto-refresh 15min</span>
+      <label class="toggle"><input type="checkbox" id="tog-auto"><span class="toggle-slider"></span></label>
+    </div>
+  </div>
+  <div class="settings-group">
+    <div class="settings-title">Worker</div>
+    <div class="settings-row">
+      <span class="settings-label">URL</span>
+      <span class="settings-value" style="font-size:10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;">tg-scanner.mlmassimo68</span>
+    </div>
+    <div class="settings-row">
+      <span class="settings-label">Stato</span>
+      <span class="settings-value" id="workerStatus">—</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════
+const WORKER = 'https://tg-scanner.mlmassimo68.workers.dev';
+
+const TICKERS = [
+  // ── LEVERAGED ──
+  { sym: '3QQQ.TI',  yahoo: '3QQQ.TI',  name: '3x NASDAQ Long',       group: 'LEV',  lev: 3 },
+  { sym: 'US9L.TI',  yahoo: 'US9L.TI',  name: '3x S&P500 Long',       group: 'LEV',  lev: 3 },
+  { sym: 'DBPG.DE',  yahoo: 'DBPG.DE',  name: '2x S&P500 Long',       group: 'LEV',  lev: 2 },
+  { sym: 'LYMZ.PA',  yahoo: 'LYMZ.PA',  name: '2x EuroStoxx Long',    group: 'LEV',  lev: 2 },
+  { sym: '3DEL.TI',  yahoo: '3DEL.TI',  name: '3x DAX Long',          group: 'LEV',  lev: 3 },
+  { sym: '3WTI.TI',  yahoo: '3WTI.TI',  name: '3x WTI Long',          group: 'LEV',  lev: 3 },
+  { sym: 'DBPK.DE',  yahoo: 'DBPK.DE',  name: '2x S&P500 Short',      group: 'LEV',  lev: -2 },
+  { sym: '3QSS.TI',  yahoo: '3QSS.TI',  name: '3x NASDAQ Short',      group: 'LEV',  lev: -3 },
+  // ── THEMATIC ──
+  { sym: 'QUTM.DE',  yahoo: 'QUTM.DE',  name: 'Quantum Computing',    group: 'THM',  lev: 1 },
+  { sym: 'WIRE.DE',  yahoo: 'WIRE.DE',  name: 'Smart Grid',           group: 'THM',  lev: 1 },
+  { sym: 'HYCN.DE',  yahoo: 'HYCN.DE',  name: 'Hydrogen',             group: 'THM',  lev: 1 },
+  { sym: 'SEC0.DE',  yahoo: 'SEC0.DE',  name: 'Semiconductors',       group: 'THM',  lev: 1 },
+  { sym: 'JEDI.DE',  yahoo: 'JEDI.DE',  name: 'Space Innovators',     group: 'THM',  lev: 1 },
+  { sym: 'IART.DE',  yahoo: 'IART.DE',  name: 'AI Innovation',        group: 'THM',  lev: 1 },
+  { sym: 'AIFS.DE',  yahoo: 'AIFS.DE',  name: 'AI Infrastructure',    group: 'THM',  lev: 1 },
+  { sym: 'DFEN.DE',  yahoo: 'DFEN.DE',  name: 'Defence',              group: 'THM',  lev: 1 },
+  { sym: 'SXR8.DE',  yahoo: 'SXR8.DE',  name: 'S&P500 Core',          group: 'CORE', lev: 1 },
+  { sym: 'SXRV.DE',  yahoo: 'SXRV.DE',  name: 'NASDAQ 100',           group: 'CORE', lev: 1 },
+  { sym: 'EUNL.DE',  yahoo: 'EUNL.DE',  name: 'MSCI World',           group: 'CORE', lev: 1 },
+  { sym: 'EXS1.DE',  yahoo: 'EXS1.DE',  name: 'DAX Core',             group: 'CORE', lev: 1 },
+];
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let scanResults   = [];
+let tickerCache   = {};   // sym → { h1: [], m15: [] }
+let isScanning    = false;
+let autoTimer     = null;
+let logLines      = [];
+
+// ═══════════════════════════════════════════════
+// CLOCK & SESSION
+// ═══════════════════════════════════════════════
+function getItalianHour() {
+  const now = new Date();
+  const it = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Rome' }));
+  return it.getHours() + it.getMinutes() / 60;
+}
+
+function getSession() {
+  const h = getItalianHour();
+  // Weekend check
+  const day = new Date().toLocaleString('en-US', { timeZone: 'Europe/Rome', weekday: 'short' });
+  if (day === 'Sat' || day === 'Sun') return 'closed';
+  if (h >= 10.0 && h < 12.5)  return 'london';
+  if (h >= 15.5 && h < 17.0)  return 'ny';
+  if (h >= 9.0  && h < 17.5)  return 'open';
+  return 'closed';
+}
+
+function updateClock() {
+  const now = new Date();
+  const it = now.toLocaleString('it-IT', {
+    timeZone: 'Europe/Rome',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+  document.getElementById('clock').textContent = it;
+
+  const session = getSession();
+  const badge = document.getElementById('sessionBadge');
+  badge.className = 'session-badge';
+  if (session === 'london') {
+    badge.classList.add('session-london');
+    badge.textContent = 'LONDON';
+  } else if (session === 'ny') {
+    badge.classList.add('session-ny');
+    badge.textContent = 'NEW YORK';
+  } else {
+    badge.classList.add('session-closed');
+    badge.textContent = session === 'open' ? 'OPEN' : 'CLOSED';
+  }
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ═══════════════════════════════════════════════
+// LOGGING
+// ═══════════════════════════════════════════════
+function log(msg, type = 'info') {
+  const time = new Date().toLocaleTimeString('it-IT', { timeZone: 'Europe/Rome' });
+  const cls  = type === 'ok' ? 'log-ok' : type === 'err' ? 'log-err' : 'log-info';
+  logLines.push(`<span class="${cls}">[${time}] ${msg}</span>`);
+  if (logLines.length > 60) logLines.shift();
+  const el = document.getElementById('logArea');
+  el.innerHTML = logLines.join('<br>');
+  el.scrollTop = el.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════
+// YAHOO FETCH via Worker
+// ═══════════════════════════════════════════════
+async function fetchCandles(yahooSym, interval, range) {
+  const url = `${WORKER}/?symbol=${encodeURIComponent(yahooSym)}&interval=${interval}&range=${range}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  const result = json?.chart?.result?.[0];
+  if (!result) throw new Error('no data');
+
+  const ts     = result.timestamp || [];
+  const q      = result.indicators?.quote?.[0] || {};
+  const closes = q.close  || [];
+  const opens  = q.open   || [];
+  const highs  = q.high   || [];
+  const lows   = q.low    || [];
+  const vols   = q.volume || [];
+
+  // filter nulls
+  const candles = ts.map((t, i) => ({
+    t: t, o: opens[i], h: highs[i], l: lows[i], c: closes[i], v: vols[i]
+  })).filter(c => c.c !== null && c.c !== undefined);
+
+  return {
+    candles,
+    price:     result.meta?.regularMarketPrice || candles[candles.length-1]?.c,
+    prevClose: result.meta?.previousClose,
+    currency:  result.meta?.currency || 'EUR',
+  };
+}
+
+// ═══════════════════════════════════════════════
+// INDICATORS
+// ═══════════════════════════════════════════════
+function ema(values, period) {
+  if (values.length < period) return [];
+  const k = 2 / (period + 1);
+  const result = [];
+  let prev = values.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  result.push(prev);
+  for (let i = period; i < values.length; i++) {
+    prev = values[i] * k + prev * (1 - k);
+    result.push(prev);
+  }
+  return result;
+}
+
+function avgVolume(candles, n = 10) {
+  const slice = candles.slice(-n - 1, -1).map(c => c.v).filter(v => v);
+  if (!slice.length) return 0;
+  return slice.reduce((a, b) => a + b, 0) / slice.length;
+}
+
+function analyzeCandles(candles, emaFast = 9, emaSlow = 21) {
+  if (candles.length < emaSlow + 2) return null;
+  const closes = candles.map(c => c.c);
+  const ef = ema(closes, emaFast);
+  const es = ema(closes, emaSlow);
+
+  // align: ema_slow starts at index (emaSlow-1) of closes
+  // ef has length = closes.length - emaFast + 1
+  // es has length = closes.length - emaSlow + 1
+  const lastClose  = closes[closes.length - 1];
+  const prevClose  = closes[closes.length - 2];
+  const lastEF     = ef[ef.length - 1];
+  const prevEF     = ef[ef.length - 2];
+  const lastES     = es[es.length - 1];
+  const prevES     = es[es.length - 2];
+
+  const trendUp    = lastEF > lastES;
+  const trendDown  = lastEF < lastES;
+  const priceAboveEF = lastClose > lastEF;
+  const priceBelowEF = lastClose < lastEF;
+
+  // crossover
+  const bullCross  = prevEF <= prevES && lastEF > lastES;
+  const bearCross  = prevEF >= prevES && lastEF < lastES;
+
+  // pullback: price touched ema and bounced
+  const pullbackUp   = trendUp   && candles[candles.length-2].l <= prevEF * 1.002 && lastClose > lastEF;
+  const pullbackDown = trendDown && candles[candles.length-2].h >= prevEF * 0.998 && lastClose < lastEF;
+
+  // volume
+  const lastVol = candles[candles.length-1].v || 0;
+  const avgVol  = avgVolume(candles);
+  const volSpike = avgVol > 0 && lastVol > avgVol * 1.8;
+
+  // momentum: price change last 3 candles
+  const c3 = closes[closes.length - 4] || closes[0];
+  const momentum3 = ((lastClose - c3) / c3) * 100;
+
+  return {
+    lastClose, lastEF, lastES,
+    trendUp, trendDown,
+    bullCross, bearCross,
+    pullbackUp, pullbackDown,
+    priceAboveEF, priceBelowEF,
+    volSpike,
+    lastVol, avgVol,
+    momentum3,
+  };
+}
+
+// ═══════════════════════════════════════════════
+// SCORING ENGINE
+// ═══════════════════════════════════════════════
+function scoreSignal(h1, m15, meta, ticker) {
+  if (!h1 || !m15) return null;
+
+  let score     = 0;
+  let signal    = 'WATCH';
+  let reason    = [];
+  let direction = 0; // +1 long, -1 short
+
+  const session = getSession();
+  const inSession = session === 'london' || session === 'ny' || session === 'open';
+
+  // ── TREND H1 (max 3pt) ──
+  if (h1.trendUp)   { score += 2; reason.push('H1↑'); direction = 1; }
+  if (h1.trendDown) { score += 2; reason.push('H1↓'); direction = -1; }
+  if (h1.bullCross) { score += 1; reason.push('CROSS↑'); }
+  if (h1.bearCross) { score += 1; reason.push('CROSS↓'); }
+
+  // ── CONFERMA 15M (max 2pt) ──
+  if (h1.trendUp   && m15.trendUp   && m15.priceAboveEF) { score += 2; reason.push('15m✓'); }
+  if (h1.trendDown && m15.trendDown && m15.priceBelowEF) { score += 2; reason.push('15m✓'); }
+
+  // ── PULLBACK ENTRY (max 2pt) ──
+  if (h1.pullbackUp)   { score += 2; signal = 'PULLBACK'; reason.push('PB↑'); }
+  if (h1.pullbackDown) { score += 2; signal = 'PULLBACK'; reason.push('PB↓'); }
+
+  // ── VOLUME SPIKE (max 2pt) ──
+  if (h1.volSpike) { score += 2; reason.push('VOL!'); }
+
+  // ── MOMENTUM (max 1pt) ──
+  const absM = Math.abs(h1.momentum3);
+  if (absM > 1.5) { score += 1; reason.push(`M${h1.momentum3.toFixed(1)}%`); }
+
+  // ── SESSION BONUS (max 1pt) ──
+  if (inSession) { score += 1; }
+
+  // ── SIGNAL TYPE ──
+  if (score >= 7) {
+    if (h1.bullCross || h1.bearCross) signal = 'BREAKOUT';
+    else if (h1.pullbackUp || h1.pullbackDown) signal = 'PULLBACK';
+    else signal = 'MOMENTUM';
+  }
+
+  // ── LEVELS ──
+  const price  = meta.price || h1.lastClose;
+  const isLong = direction >= 0;
+  const atr    = estimateATR(h1); // simple ATR estimate
+
+  // For leveraged: tighter targets
+  const lev    = Math.abs(ticker.lev || 1);
+  const tMult  = lev >= 3 ? 1.5 : lev >= 2 ? 2.0 : 2.5;
+  const sMult  = lev >= 3 ? 0.8 : lev >= 2 ? 1.0 : 1.2;
+
+  const target = isLong
+    ? +(price + atr * tMult).toFixed(4)
+    : +(price - atr * tMult).toFixed(4);
+  const stop = isLong
+    ? +(price - atr * sMult).toFixed(4)
+    : +(price + atr * sMult).toFixed(4);
+
+  const gainPct = Math.abs((target - price) / price * 100);
+  const lossPct = Math.abs((stop   - price) / price * 100);
+  const rr      = lossPct > 0 ? (gainPct / lossPct) : 0;
+
+  return {
+    score:     Math.min(score, 10),
+    signal,
+    direction,
+    reason,
+    price,
+    target,
+    stop,
+    gainPct,
+    lossPct,
+    rr,
+    volRatio: h1.avgVol > 0 ? h1.lastVol / h1.avgVol : 0,
+    avgVol:   h1.avgVol,
+    lastVol:  h1.lastVol,
+    trendUp:  h1.trendUp,
+    momentum: h1.momentum3,
+    change:   meta.prevClose ? ((meta.price - meta.prevClose) / meta.prevClose * 100) : 0,
+  };
+}
+
+function estimateATR(data) {
+  // very rough: use 1% of price as ATR proxy if no H/L data
+  return data.lastClose * 0.010;
+}
+
+// ═══════════════════════════════════════════════
+// MAIN SCAN
+// ═══════════════════════════════════════════════
+async function runScan() {
+  if (isScanning) return;
+  isScanning = true;
+
+  const btn = document.getElementById('btnScan');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>SCANNING...';
+
+  document.getElementById('emptySignals').style.display = 'none';
+  document.getElementById('signalCards').innerHTML = '';
+  scanResults = [];
+
+  log('── SCAN START ──', 'info');
+
+  const useLev = document.getElementById('tog-lev').checked;
+  const tickers = TICKERS.filter(t => useLev || Math.abs(t.lev) === 1);
+
+  let done = 0;
+  const fill = document.getElementById('progressFill');
+
+  for (const tk of tickers) {
+    try {
+      log(`Fetching ${tk.sym}...`);
+
+      // H1 — 10 giorni per avere abbastanza candele
+      const h1data  = await fetchCandles(tk.yahoo, '1h', '10d');
+      // 15m — 3 giorni
+      const m15data = await fetchCandles(tk.yahoo, '15m', '3d');
+
+      const h1  = analyzeCandles(h1data.candles, 9, 21);
+      const m15 = analyzeCandles(m15data.candles, 9, 21);
+
+      if (!h1) { log(`${tk.sym}: candele insufficienti`, 'err'); } 
+      else {
+        const sig = scoreSignal(h1, m15, h1data, tk);
+        if (sig) {
+          scanResults.push({ ticker: tk, sig });
+          log(`${tk.sym} → score ${sig.score}/10 [${sig.signal}]`, sig.score >= 6 ? 'ok' : 'info');
+        }
+      }
+
+      // update watchlist cache
+      tickerCache[tk.sym] = { price: h1data.price, change: h1data.prevClose ? ((h1data.price - h1data.prevClose) / h1data.prevClose * 100) : 0 };
+
+    } catch(e) {
+      log(`${tk.sym}: ${e.message}`, 'err');
+    }
+
+    done++;
+    fill.style.width = (done / tickers.length * 100) + '%';
+
+    // small delay to avoid rate limiting
+    await sleep(200);
+  }
+
+  // sort by score desc
+  scanResults.sort((a, b) => b.sig.score - a.sig.score);
+
+  renderSignals();
+  renderWatchlist();
+
+  const now = new Date().toLocaleTimeString('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit' });
+  document.getElementById('lastScanTime').textContent = now;
+  document.getElementById('workerStatus').textContent = 'OK';
+
+  log(`── SCAN DONE — ${scanResults.length} ticker analizzati ──`, 'ok');
+
+  btn.disabled = false;
+  btn.innerHTML = '⚡ AVVIA SCAN';
+
+  setTimeout(() => { fill.style.width = '0%'; }, 1000);
+  isScanning = false;
+
+  // auto-refresh
+  if (document.getElementById('tog-auto').checked) {
+    if (autoTimer) clearTimeout(autoTimer);
+    autoTimer = setTimeout(runScan, 15 * 60 * 1000);
+  }
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ═══════════════════════════════════════════════
+// RENDER SIGNALS
+// ═══════════════════════════════════════════════
+function renderSignals() {
+  const container = document.getElementById('signalCards');
+  container.innerHTML = '';
+
+  const top = scanResults.filter(r => r.sig.score >= 5).slice(0, 8);
+
+  if (!top.length) {
+    document.getElementById('emptySignals').style.display = 'block';
+    document.getElementById('emptySignals').querySelector('.empty-title').textContent = 'Nessun segnale attivo';
+    document.getElementById('emptySignals').querySelector('.empty-sub').textContent = 'Score < 5 per tutti i ticker.\nMercato laterale o sessione chiusa.';
+    return;
+  }
+
+  // section header
+  const hdr = document.createElement('div');
+  hdr.className = 'section-hdr';
+  hdr.innerHTML = `<h3>Segnali attivi</h3><span>${top.length} ticker — aggiornato ora</span>`;
+  container.appendChild(hdr);
+
+  top.forEach((r, i) => {
+    const { ticker, sig } = r;
+    const card = document.createElement('div');
+    card.className = 'signal-card';
+
+    const rankClass = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '';
+    const scoreClass = sig.score >= 8 ? 'score-high' : sig.score >= 6 ? 'score-mid' : 'score-low';
+    const chgClass   = sig.change > 0 ? 'up' : sig.change < 0 ? 'down' : 'flat';
+    const chgSign    = sig.change > 0 ? '+' : '';
+
+    const sigClass = sig.signal === 'MOMENTUM' ? 'sig-momentum'
+                   : sig.signal === 'PULLBACK'  ? 'sig-pullback'
+                   : sig.signal === 'BREAKOUT'  ? 'sig-breakout'
+                   : 'sig-watch';
+
+    const dirArrow = sig.direction > 0 ? '▲' : sig.direction < 0 ? '▼' : '—';
+    const dirClass = sig.direction > 0 ? 'up' : sig.direction < 0 ? 'down' : 'flat';
+
+    // vol ratio display
+    const volPct = Math.min(sig.volRatio / 3 * 100, 100);
+    const volColor = sig.volRatio > 2 ? 'var(--green)' : sig.volRatio > 1 ? 'var(--yellow)' : 'var(--accent)';
+
+    // RR bar
+    const rrTotal = sig.gainPct + sig.lossPct;
+    const gainW   = rrTotal > 0 ? (sig.gainPct / rrTotal * 100).toFixed(0) : 50;
+    const lossW   = rrTotal > 0 ? (sig.lossPct / rrTotal * 100).toFixed(0) : 50;
+
+    // indicators
+    const inds = sig.reason.map(r => {
+      const ok = r.includes('↑') || r.includes('✓') || r === 'VOL!';
+      return `<span class="ind-pill ${ok ? 'ind-ok' : 'ind-warn'}">${r}</span>`;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="card-left">
+          <div class="rank ${rankClass}">${i + 1}</div>
+          <div>
+            <div class="ticker">${ticker.sym.split('.')[0]} <span style="color:var(--dim);font-size:11px">.${ticker.sym.split('.')[1]}</span></div>
+            <div class="ticker-name">${ticker.name} ${ticker.lev !== 1 ? `<span style="color:var(--yellow)">${ticker.lev > 0 ? '+' : ''}${ticker.lev}x</span>` : ''}</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="score-badge ${scoreClass}">${sig.score}<span style="font-size:12px;color:var(--dim)">/10</span></div>
+          <div style="margin-top:3px"><span class="signal-type ${sigClass}">${sig.signal}</span></div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="price-row">
+          <span class="price-current ${dirClass}">€${fmt(sig.price)}</span>
+          <span class="price-change ${chgClass}">${dirArrow} ${chgSign}${sig.change.toFixed(2)}%</span>
+        </div>
+        <div class="levels">
+          <div class="level-box">
+            <div class="level-label">ENTRY</div>
+            <div class="level-value lv-entry">€${fmt(sig.price)}</div>
+          </div>
+          <div class="level-box">
+            <div class="level-label">TARGET</div>
+            <div class="level-value lv-target">€${fmt(sig.target)}</div>
+          </div>
+          <div class="level-box">
+            <div class="level-label">STOP</div>
+            <div class="level-value lv-stop">€${fmt(sig.stop)}</div>
+          </div>
+        </div>
+        <div class="rr-bar">
+          <span class="rr-label">R/R</span>
+          <div class="rr-track">
+            <div class="rr-gain" style="width:${gainW}%"></div>
+            <div class="rr-loss" style="width:${lossW}%;left:auto"></div>
+          </div>
+          <span class="rr-value">${sig.rr.toFixed(1)}:1</span>
+        </div>
+        <div class="vol-row">
+          <span class="vol-label">VOL</span>
+          <div class="vol-bar-bg">
+            <div class="vol-bar-fill" style="width:${volPct}%;background:${volColor}"></div>
+          </div>
+          <span class="vol-value">${sig.volRatio.toFixed(1)}x</span>
+        </div>
+        <div class="indicators" style="margin-top:8px">${inds}</div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// RENDER WATCHLIST
+// ═══════════════════════════════════════════════
+function renderWatchlist() {
+  const container = document.getElementById('watchlistRows');
+  container.innerHTML = '';
+
+  const hdr = document.createElement('div');
+  hdr.className = 'section-hdr';
+  hdr.innerHTML = `<h3>Tutti i ticker</h3><span>${TICKERS.length} strumenti</span>`;
+  container.appendChild(hdr);
+
+  // group header
+  const groups = ['LEV', 'THM', 'CORE'];
+  const gLabels = { LEV: 'LEVERAGED', THM: 'THEMATIC', CORE: 'CORE ETF' };
+
+  for (const g of groups) {
+    const div = document.createElement('div');
+    div.style.cssText = 'font-size:10px;font-family:var(--mono);color:var(--dim);letter-spacing:2px;padding:8px 4px 4px;';
+    div.textContent = gLabels[g];
+    container.appendChild(div);
+
+    TICKERS.filter(t => t.group === g).forEach(tk => {
+      const cache = tickerCache[tk.sym];
+      const row = document.createElement('div');
+      row.className = 'wl-row';
+
+      const chg = cache?.change ?? null;
+      const chgClass = chg === null ? 'flat' : chg > 0 ? 'up' : chg < 0 ? 'down' : 'flat';
+      const chgStr = chg === null ? '—' : `${chg > 0 ? '+' : ''}${chg.toFixed(2)}%`;
+      const priceStr = cache?.price ? `€${fmt(cache.price)}` : '—';
+
+      row.innerHTML = `
+        <div>
+          <div class="wl-sym">${tk.sym.split('.')[0]}</div>
+          <div class="wl-name">${tk.name}</div>
+        </div>
+        <div class="wl-price">
+          <div style="font-family:var(--mono);font-size:13px;">${priceStr}</div>
+          <div class="wl-chg ${chgClass}">${chgStr}</div>
+        </div>
+      `;
+      container.appendChild(row);
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════
+function showTab(name) {
+  ['signals','watchlist','log','settings'].forEach(t => {
+    document.getElementById(`view-${t}`).style.display   = t === name ? '' : 'none';
+    document.getElementById(`tab-${t}`)?.classList.toggle('active', t === name);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════
+function fmt(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  if (n >= 100)  return n.toFixed(2);
+  if (n >= 10)   return n.toFixed(3);
+  return n.toFixed(4);
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+renderWatchlist();
+log('TG Scanner pronto. Premi AVVIA SCAN.', 'ok');
+</script>
+</body>
+</html>
