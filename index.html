@@ -592,27 +592,28 @@ const WORKER = 'https://tg-scanner.mlmassimo68.workers.dev';
 
 const TICKERS = [
   // ── LEVERAGED ──
-  { sym: '3QQQ',    yahoo: 'QQQ3.L',   name: '3x NASDAQ Long',    group: 'LEV', lev: 3 },
-  { sym: 'US9L',    yahoo: 'US9L.BE',  name: '3x S&P500 Long',    group: 'LEV', lev: 3 },
-  { sym: 'DBPG',    yahoo: 'DBPG.DE',  name: '2x S&P500 Long',    group: 'LEV', lev: 2 },
-  { sym: 'LYMZ',    yahoo: 'LYMZ.DE',  name: '2x EuroStoxx Long', group: 'LEV', lev: 2 },
-  { sym: '3DEL',    yahoo: '3DEL.DE',  name: '3x DAX Long',       group: 'LEV', lev: 3 },
-  { sym: '3WTI',    yahoo: '3WTI.DE',  name: '3x WTI Long',       group: 'LEV', lev: 3 },
-  { sym: 'DBPK',    yahoo: 'DBPK.DE',  name: '2x S&P500 Short',   group: 'LEV', lev: -2 },
-  { sym: '3QSS',    yahoo: 'QQQ3S.L',  name: '3x NASDAQ Short',   group: 'LEV', lev: -3 },
+  { sym: '3QQQ',  yahoo: 'QQQ3.L',   name: '3x NASDAQ Long',    group: 'LEV', lev: 3  },
+  { sym: 'US9L',  yahoo: 'US9L.SG',  name: '3x S&P500 Long',    group: 'LEV', lev: 3  },
+  { sym: 'DBPG',  yahoo: 'DBPG.DE',  name: '2x S&P500 Long',    group: 'LEV', lev: 2  },
+  { sym: 'LYMZ',  yahoo: 'LYMZ.DE',  name: '2x EuroStoxx Long', group: 'LEV', lev: 2  },
+  { sym: '3DEL',  yahoo: '3DEL.L',   name: '3x DAX Long',       group: 'LEV', lev: 3  },
+  { sym: '3WTI',  yahoo: '3OIL.DE',  name: '3x WTI Long',       group: 'LEV', lev: 3  },
+  { sym: 'DBPK',  yahoo: 'DBPK.DE',  name: '2x S&P500 Short',   group: 'LEV', lev: -2 },
+  { sym: '3QSS',  yahoo: 'QQQ3S.L',  name: '3x NASDAQ Short',   group: 'LEV', lev: -3 },
   // ── THEMATIC ──
-  { sym: 'QUTM.DE',  yahoo: 'QUTM.DE',  name: 'Quantum Computing',    group: 'THM',  lev: 1 },
-  { sym: 'WIRE.DE',  yahoo: 'WIRE.DE',  name: 'Smart Grid',           group: 'THM',  lev: 1 },
-  { sym: 'HYCN.DE',  yahoo: 'HYCN.DE',  name: 'Hydrogen',             group: 'THM',  lev: 1 },
-  { sym: 'SEC0.DE',  yahoo: 'SEC0.DE',  name: 'Semiconductors',       group: 'THM',  lev: 1 },
-  { sym: 'JEDI.DE',  yahoo: 'JEDI.DE',  name: 'Space Innovators',     group: 'THM',  lev: 1 },
-  { sym: 'IART.DE',  yahoo: 'IART.DE',  name: 'AI Innovation',        group: 'THM',  lev: 1 },
-  { sym: 'AIFS.DE',  yahoo: 'AIFS.DE',  name: 'AI Infrastructure',    group: 'THM',  lev: 1 },
-  { sym: 'DFEN.DE',  yahoo: 'DFEN.DE',  name: 'Defence',              group: 'THM',  lev: 1 },
-  { sym: 'SXR8.DE',  yahoo: 'SXR8.DE',  name: 'S&P500 Core',          group: 'CORE', lev: 1 },
-  { sym: 'SXRV.DE',  yahoo: 'SXRV.DE',  name: 'NASDAQ 100',           group: 'CORE', lev: 1 },
-  { sym: 'EUNL.DE',  yahoo: 'EUNL.DE',  name: 'MSCI World',           group: 'CORE', lev: 1 },
-  { sym: 'EXS1.DE',  yahoo: 'EXS1.DE',  name: 'DAX Core',             group: 'CORE', lev: 1 },
+  { sym: 'QUTM',  yahoo: 'QUTM.DE',  name: 'Quantum Computing', group: 'THM', lev: 1 },
+  { sym: 'WIRE',  yahoo: 'WIRE.DE',  name: 'Smart Grid',        group: 'THM', lev: 1 },
+  { sym: 'HYCN',  yahoo: 'HYCN.DE',  name: 'Hydrogen',          group: 'THM', lev: 1 },
+  { sym: 'SEC0',  yahoo: 'SEC0.DE',  name: 'Semiconductors',    group: 'THM', lev: 1 },
+  { sym: 'JEDI',  yahoo: 'JEDI.DE',  name: 'Space Innovators',  group: 'THM', lev: 1 },
+  { sym: 'IART',  yahoo: 'IART.DE',  name: 'AI Innovation',     group: 'THM', lev: 1 },
+  { sym: 'AIFS',  yahoo: 'AIFS.DE',  name: 'AI Infrastructure', group: 'THM', lev: 1 },
+  { sym: 'DFEN',  yahoo: 'DFEN.DE',  name: 'Defence',           group: 'THM', lev: 1 },
+  // ── CORE ──
+  { sym: 'SXR8',  yahoo: 'SXR8.DE',  name: 'S&P500 Core',       group: 'CORE', lev: 1 },
+  { sym: 'SXRV',  yahoo: 'SXRV.DE',  name: 'NASDAQ 100',        group: 'CORE', lev: 1 },
+  { sym: 'EUNL',  yahoo: 'EUNL.DE',  name: 'MSCI World',        group: 'CORE', lev: 1 },
+  { sym: 'EXS1',  yahoo: 'EXS1.DE',  name: 'DAX Core',          group: 'CORE', lev: 1 },
 ];
 
 // ═══════════════════════════════════════════════
