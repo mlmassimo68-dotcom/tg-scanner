@@ -1,14 +1,40 @@
 {
   "name": "TG Scanner",
-  "short_name": "TGScan",
-  "description": "Tradegate Long Scanner — Serverless PWA",
-  "start_url": "./",
+  "short_name": "TGScanner",
+  "description": "Trading scanner Tradegate con notifiche Telegram",
+  "start_url": "./index.html",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#060a10",
-  "theme_color": "#060a10",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0f1e",
+  "theme_color": "#0a0f1e",
+  "lang": "it",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Avvia Scanner",
+      "short_name": "Scan",
+      "url": "./index.html?action=scan",
+      "description": "Avvia scan manuale"
+    },
+    {
+      "name": "Trade aperti",
+      "short_name": "Segnali",
+      "url": "./index.html#segnali",
+      "description": "Vedi trade aperti"
+    }
   ]
 }
