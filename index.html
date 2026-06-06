@@ -246,7 +246,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'SF Pro
       <div style="margin-bottom:14px">
         <div class="legend-title">▶ Flusso operativo</div>
         <div class="legend-step"><div class="legend-num">1</div><div class="legend-text"><strong>Cron automatico</strong> ogni 15 min lun–ven 09:00–19:45. Il worker scansiona tutti i ticker e invia notifiche Telegram per segnali BUY/SELL.</div></div>
-        <div class="legend-step"><div class="legend-num">2</div><div class="legend-text"><strong>Ricevi notifica Telegram</strong> → vedi ticker, prezzo entrata, TP, SL, score. Il trade viene aperto automaticamente nel sistema.</div></div>
+        <div class="legend-step"><div class="legend-num">2</div><div class="legend-text"><strong>Ricevi notifica Telegram</strong> → vedi ticker, prezzo entrata, TP, SL, score e <strong>anzianità segnale</strong>. Segnali con ⏳ 3h+ sono meno affidabili. Il trade viene aperto automaticamente nel sistema.</div></div>
         <div class="legend-step"><div class="legend-num">3</div><div class="legend-text"><strong>Apri la posizione su DEGIRO</strong> manualmente al prezzo indicato. Usa il tab Segnali per monitorare la salute del trade.</div></div>
         <div class="legend-step"><div class="legend-num">4</div><div class="legend-text"><strong>Ricevi notifica di uscita</strong> (TP / SL / TIME / REVERSAL). Chiudi la posizione su DEGIRO al prezzo indicato. In alternativa usa il pulsante chiudi manuale nella scheda trade.</div></div>
         <div class="legend-step"><div class="legend-num">5</div><div class="legend-text"><strong>Inserisci prezzo corrente</strong> nel campo manuale della scheda trade (tab Segnali) per calcolare P&L in tempo reale senza automazione.</div></div>
@@ -255,10 +255,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'SF Pro
       <div style="margin-bottom:14px">
         <div class="legend-title">📊 Score 0–100</div>
         <div class="score-legend" style="margin-bottom:10px">
-          <div class="score-item"><span class="sv" style="color:var(--green)">≥ 72</span><span style="color:var(--muted)">BUY<br>Entrata long</span></div>
-          <div class="score-item"><span class="sv" style="color:var(--amber)">60–71</span><span style="color:var(--muted)">WATCH<br>Attenzione</span></div>
-          <div class="score-item"><span class="sv" style="color:var(--muted)">29–59</span><span style="color:var(--muted)">NEUTRAL<br>Nessuna azione</span></div>
-          <div class="score-item"><span class="sv" style="color:var(--red)">≤ 28</span><span style="color:var(--muted)">SELL<br>Compra inverso</span></div>
+          <div class="score-item"><span class="sv" style="color:var(--green)">≥ 75</span><span style="color:var(--muted)">BUY<br>Entrata long</span></div>
+          <div class="score-item"><span class="sv" style="color:var(--amber)">60–74</span><span style="color:var(--muted)">WATCH<br>Attenzione</span></div>
+          <div class="score-item"><span class="sv" style="color:var(--muted)">26–59</span><span style="color:var(--muted)">NEUTRAL<br>Nessuna azione</span></div>
+          <div class="score-item"><span class="sv" style="color:var(--red)">≤ 25</span><span style="color:var(--muted)">SELL<br>Inverso se score≥60</span></div>
         </div>
         <div class="legend-tip">⚠️ Score calcolato su candele 1h Yahoo Finance: <strong>Trend EMA (25%) + RSI (20%) + MACD (25%) + Volume (15%) + Corpo candela (15%)</strong></div>
       </div>
@@ -284,10 +284,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'SF Pro
       </div>
 
       <div>
-        <div class="legend-title">⚙️ Regole operative DEGIRO</div>
-        <div class="legend-tip"><strong>No short:</strong> Non vendere mai allo scoperto. I segnali SELL comprano automaticamente il ticker inverso (es. DBPG SELL → compra DBPK).</div>
-        <div class="legend-tip"><strong>Commissioni:</strong> €1 per operazione su Tradegate. Su ticker a basso prezzo (es. DBPK ~€0,14) la commissione è &gt;1% del valore — usa posizioni ≥ €200 per ammortizzarla.</div>
-        <div class="legend-tip"><strong>Orario:</strong> Tradegate 08:00–22:00 CET. Lo scanner gira 09:00–19:45 IT per concentrarsi sulle ore liquide con Xetra aperta (09:00–17:30).</div>
+        <div class="legend-title">⚙️ Regole operative DEGIRO / Tradegate</div>
+        <div class="legend-tip"><strong>No short:</strong> Non vendere mai allo scoperto. I segnali SELL comprano automaticamente il ticker inverso (es. DBPG SELL → compra DBPK). Il filtro doppio verifica che anche l'inverso abbia score ≥ 60 prima di aprire.</div>
+        <div class="legend-tip"><strong>Commissioni Tradegate:</strong> <span style="color:var(--green)">€0 per operazione</span> (mercato di connettività DEGIRO). Solo €2,50/anno per borsa come fee di connettività. Il break-even dipende dallo spread bid/ask del ticker.</div>
+        <div class="legend-tip"><strong>Slippage:</strong> Il prezzo di entrata mostrato è il <em>close</em> dell'ultima candela 1h. Il prezzo reale su DEGIRO potrebbe differire di qualche centesimo — usa il campo "Prezzo attuale" nella scheda trade per calcolare il P&L reale.</div>
+        <div class="legend-tip"><strong>Orario scan:</strong> Lun–Ven 09:00–17:30 IT (Xetra aperta). Il worker non genera segnali fuori orario né nel weekend. Se ricevi un segnale fuori orario è stato triggerato manualmente con "Avvia Scanner".</div>
+        <div class="legend-tip"><strong>Anzianità segnale:</strong> Ogni notifica Telegram indica da quante candele (1h) il segnale è attivo. 🔥 NUOVO = freschissimo, ⚡ 1h = ancora valido, ⏳ 3h+ = valuta con cautela.</div>
+        <div class="legend-tip"><strong>Time stop differenziato:</strong> Ticker <span class="type-3x">3x</span> e <span class="type-inv">INV</span> escono dopo 4h (alta volatilità). ETF e tematici dopo 8h.</div>
         <div class="legend-tip"><strong>Max 4 trade simultanei</strong> per diversificare il rischio senza sovraccaricare il monitoraggio manuale.</div>
       </div>
     </div>
@@ -304,6 +307,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'SF Pro
     </div>
     <div class="setting-group">
       <div class="setting-group-title">Trade management</div>
+      <div class="setting-row"><div><div class="setting-label">Commissioni Tradegate</div><div class="setting-sub">DEGIRO mercato connettività</div></div><span class="setting-val" style="color:var(--green)">€0</span></div>
       <div class="setting-row"><div><div class="setting-label">Take Profit</div><div class="setting-sub">Tutti i ticker</div></div><span class="setting-val">+3.5%</span></div>
       <div class="setting-row"><div><div class="setting-label">Stop Loss</div><div class="setting-sub">Tutti i ticker</div></div><span class="setting-val">-1.8%</span></div>
       <div class="setting-row"><div><div class="setting-label">Time Stop — 3x / INV</div><div class="setting-sub">Ticker a leva (alta volatilità)</div></div><span class="setting-val">4h</span></div>
@@ -312,8 +316,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'SF Pro
     </div>
     <div class="setting-group">
       <div class="setting-group-title">Scoring</div>
-      <div class="setting-row"><div><div class="setting-label">Soglia BUY</div><div class="setting-sub">Score minimo entrata</div></div><span class="setting-val">≥ 72</span></div>
-      <div class="setting-row"><div><div class="setting-label">Soglia SELL → inverso</div><div class="setting-sub">Score massimo (acquisto inverso)</div></div><span class="setting-val">≤ 28</span></div>
+      <div class="setting-row"><div><div class="setting-label">Soglia BUY</div><div class="setting-sub">Score minimo entrata</div></div><span class="setting-val">≥ 75</span></div>
+      <div class="setting-row"><div><div class="setting-label">Soglia SELL → inverso</div><div class="setting-sub">Score max + inverso deve avere score ≥ 60</div></div><span class="setting-val">≤ 25</span></div>
     </div>
     <div class="setting-group">
       <div class="setting-group-title">Azioni</div>
