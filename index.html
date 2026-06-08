@@ -185,7 +185,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'SF Pro
 <div class="header">
   <div class="header-logo">
     <div class="logo-dot"></div>
-    <div class="logo-text">TG<span>Scanner</span></div>
+    <div>
+      <div class="logo-text">TG<span>Scanner</span></div>
+      <div style="font-size:9px;color:var(--muted);letter-spacing:.5px;margin-top:-2px">v3.2 · ATR · H4 · RSI-div</div>
+    </div>
   </div>
   <button class="scan-btn" id="scanBtn" onclick="triggerScan()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
@@ -591,46 +594,46 @@ async function closeTradeManual(label){
 // ── CLASSIFICA ────────────────────────────────────────────────────────────
 async function loadClassifica(){
   const el=document.getElementById('classificaList');
-  el.innerHTML='<div class="empty"><p>Caricamento da Yahoo Finance…</p></div>';
-  const labels=Object.keys(TICKERS);
-  const results=[];
-  for(const label of labels){
-    const def=TICKERS[label];
-    try{
-      const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(def.yf)}?interval=1h&range=3d`;
-      const res=await fetch(url,{headers:{'User-Agent':'Mozilla/5.0'}});
-      if(!res.ok){results.push({label,score:null,price:null,type:def.type});continue}
-      const json=await res.json();
-      const r=json?.chart?.result?.[0];
-      if(!r){results.push({label,score:null,price:null,type:def.type});continue}
-      const q=r.indicators?.quote?.[0];
-      const ts=r.timestamp;
-      const candles=[];
-      for(let i=0;i<ts.length;i++){
-        if(q.close[i]!=null)candles.push({close:q.close[i],open:q.open[i]||q.close[i],high:q.high[i]||q.close[i],low:q.low[i]||q.close[i],volume:q.volume[i]||0});
-      }
-      const score=candles.length>=20?computeScoreJS(candles):null;
-      const price=candles.length?candles[candles.length-1].close:null;
-      results.push({label,score,price,type:def.type});
-      scanScores[label]={score,price,ts:Date.now()};
-    }catch(e){results.push({label,score:null,price:null,type:def.type})}
+  el.innerHTML='<div class="empty"><p>Caricamento prezzi via worker…</p></div>';
+  try{
+    // Usa il worker come proxy per Yahoo Finance (evita CORS)
+    const data = await apiGet('/prices');
+    const results = Object.values(data).map(r => ({
+      label: r.label,
+      score: r.score,
+      price: r.price,
+      atrPct: r.atrPct,
+      rsi: r.rsi,
+      type: TICKERS[r.label]?.type || 'etf',
+      error: r.error || null,
+    }));
+    // Salva in cache locale
+    results.forEach(r => {
+      if(r.price != null) scanScores[r.label] = {score:r.score, price:r.price, atrPct:r.atrPct, rsi:r.rsi, ts:Date.now()};
+    });
+    localStorage.setItem('tgScores', JSON.stringify(scanScores));
+    document.getElementById('lastUpdateClassifica').textContent='Aggiornato '+fmtTimeS(Date.now());
+    results.sort((a,b)=>(b.score||0)-(a.score||0));
+    const ok = results.filter(r=>r.score!=null).length;
+    el.innerHTML=results.map((r,i)=>{
+      const sc=r.score, color=sc!=null?scoreColor(sc):'var(--muted)', barW=sc!=null?sc:0;
+      const atrStr = r.atrPct!=null ? `ATR ${r.atrPct}%` : '';
+      const rsiStr = r.rsi!=null   ? `RSI ${r.rsi}` : '';
+      return`<div class="rank-row">
+        <div class="rank-num">${i+1}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px"><span class="rank-name">${r.label}</span>${typeBadge(r.type)}</div>
+          <div style="font-size:10px;color:var(--muted)">${fmtP(r.price)} ${atrStr} ${rsiStr}</div>
+        </div>
+        <div class="rank-bar"><div class="rank-bar-fill" style="width:${barW}%;background:${color}"></div></div>
+        <div class="rank-score" style="color:${color}">${sc!=null?sc:r.error?'ERR':'—'}</div>
+      </div>`;
+    }).join('');
+    addLog('ok',`Classifica: ${ok}/${results.length} ticker`);
+  }catch(e){
+    el.innerHTML=`<div class="empty"><p style="color:var(--red)">Errore: ${e.message}</p></div>`;
+    addLog('err','Classifica: '+e.message);
   }
-  localStorage.setItem('tgScores',JSON.stringify(scanScores));
-  document.getElementById('lastUpdateClassifica').textContent='Aggiornato '+fmtTimeS(Date.now());
-  results.sort((a,b)=>(b.score||0)-(a.score||0));
-  el.innerHTML=results.map((r,i)=>{
-    const sc=r.score, color=sc!=null?scoreColor(sc):'var(--muted)', barW=sc!=null?sc:0;
-    return`<div class="rank-row">
-      <div class="rank-num">${i+1}</div>
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:6px"><span class="rank-name">${r.label}</span>${typeBadge(r.type)}</div>
-        <div style="font-size:10px;color:var(--muted)">${fmtP(r.price)}</div>
-      </div>
-      <div class="rank-bar"><div class="rank-bar-fill" style="width:${barW}%;background:${color}"></div></div>
-      <div class="rank-score" style="color:${color}">${sc!=null?sc:'—'}</div>
-    </div>`;
-  }).join('');
-  addLog('ok','Classifica: '+results.filter(r=>r.score!=null).length+'/'+results.length);
 }
 
 // ── LISTA ─────────────────────────────────────────────────────────────────
