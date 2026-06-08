@@ -231,6 +231,59 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'SF Pro
     <div id="logList"></div>
   </div>
 
+  <!-- STORICO REALE DEGIRO -->
+  <div class="page" id="page-reale">
+    <div class="refresh-row">
+      <span class="last-update" id="lastUpdateReale">Storico prezzi reali DEGIRO</span>
+      <button class="refresh-btn" onclick="if(confirm('Cancellare tutto lo storico reale?')){localHistory=[];saveLocalHistory();renderReale();}">Cancella</button>
+    </div>
+    <div class="stats-row" id="realeStats"></div>
+    <div style="margin-bottom:10px">
+      <!-- Form aggiunta manuale trade -->
+      <div class="card" id="addTradeForm">
+        <div class="card-title">➕ Aggiungi trade manuale</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Ticker</div>
+            <select id="ft-label" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px">
+              ${Object.keys(TICKERS).map(l=>`<option value="${l}">${l}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Data entrata</div>
+            <input type="datetime-local" id="ft-date"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;padding:6px 8px">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Prezzo entrata (€)</div>
+            <input type="number" step="0.0001" inputmode="decimal" id="ft-entry" placeholder="0.0000"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;font-weight:600;padding:6px 8px">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Prezzo uscita (€)</div>
+            <input type="number" step="0.0001" inputmode="decimal" id="ft-exit" placeholder="0.0000"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;font-weight:600;padding:6px 8px">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Quantità (n. titoli)</div>
+            <input type="number" step="1" inputmode="numeric" id="ft-qty" placeholder="100"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;font-weight:600;padding:6px 8px">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Note (opzionale)</div>
+            <input type="text" id="ft-note" placeholder="es. slippage, motivo uscita..."
+              style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;padding:6px 8px">
+          </div>
+        </div>
+        <button onclick="addLocalTrade()"
+          style="width:100%;background:var(--accent);color:#fff;border:none;padding:10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">
+          Salva trade
+        </button>
+      </div>
+    </div>
+    <div id="realeList"></div>
+  </div>
+
   <!-- STORICO -->
   <div class="page" id="page-storico">
     <div class="refresh-row">
@@ -353,6 +406,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'SF Pro
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     Storico
   </button>
+  <button class="tab" onclick="switchTab('reale',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    DEGIRO
+  </button>
   <button class="tab" onclick="switchTab('legenda',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
     Guida
@@ -395,9 +452,11 @@ const TICKERS = {
 
 // ── STATE ─────────────────────────────────────────────────────────────────
 let openTrades = {}, tradeHistory = [];
-let logs = JSON.parse(localStorage.getItem('tgLogs')||'[]');
+let logs       = JSON.parse(localStorage.getItem('tgLogs')||'[]');
 let scanScores = JSON.parse(localStorage.getItem('tgScores')||'{}');
 let manualPrices = {};
+let realPrices   = JSON.parse(localStorage.getItem('tgRealPrices')||'{}'); // {LABEL:{entry,exit}}
+let localHistory = JSON.parse(localStorage.getItem('tgLocalHistory')||'[]'); // storico reale DEGIRO
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
 const fmtP = p => p==null?'—':p<1?p.toFixed(4):p<10?p.toFixed(3):p.toFixed(2);
@@ -432,6 +491,179 @@ let toastTimer;
 function showToast(msg){ const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2500) }
 
 // ── TABS ──────────────────────────────────────────────────────────────────
+// ── STORICO LOCALE DEGIRO ─────────────────────────────────────────────────
+function saveLocalHistory(){
+  localStorage.setItem('tgLocalHistory', JSON.stringify(localHistory));
+}
+
+function addLocalTrade(){
+  const label = document.getElementById('ft-label').value;
+  const dateV = document.getElementById('ft-date').value;
+  const entry = parseFloat(document.getElementById('ft-entry').value);
+  const exit  = parseFloat(document.getElementById('ft-exit').value);
+  const qty   = parseFloat(document.getElementById('ft-qty').value) || 0;
+  const note  = document.getElementById('ft-note').value.trim();
+
+  if (!label || isNaN(entry) || entry <= 0 || isNaN(exit) || exit <= 0) {
+    showToast('Compila almeno: ticker, entrata, uscita');
+    return;
+  }
+  const pnlPct  = (exit - entry) / entry;
+  const pnlEur  = qty > 0 ? (exit - entry) * qty : null;
+  const controv = qty > 0 ? entry * qty : null;
+  const trade = {
+    id:        Date.now(),
+    label,
+    entryPrice: entry,
+    exitPrice:  exit,
+    qty,
+    entryTime:  dateV ? new Date(dateV).getTime() : Date.now(),
+    exitTime:   Date.now(),
+    pnlPct,
+    pnlEur,
+    controvalore: controv,
+    note,
+    status:    pnlPct > 0 ? 'WIN' : 'LOSS',
+    source:    'manual',
+  };
+  localHistory.push(trade);
+  saveLocalHistory();
+  // Reset form
+  ['ft-entry','ft-exit','ft-qty','ft-note'].forEach(id => document.getElementById(id).value = '');
+  renderReale();
+  showToast('Trade salvato ✓');
+  addLog('ok', `Trade reale ${label} salvato: ${fmtPct(pnlPct)}`);
+}
+
+// Aggiunge trade automaticamente quando chiudi dalla card segnali
+function saveRealTradeFromCard(label){
+  const entry = realPrices[label]?.entry;
+  const exit  = realPrices[label]?.exit;
+  if (!entry || !exit) return;
+  const t = Object.values(openTrades).find(x=>(x.label||'')===label);
+  const pnlPct = (exit - entry) / entry;
+  const trade = {
+    id:         Date.now(),
+    label,
+    entryPrice: entry,
+    exitPrice:  exit,
+    qty:        0,
+    entryTime:  t?.entryTime || Date.now(),
+    exitTime:   Date.now(),
+    pnlPct,
+    pnlEur:     null,
+    controvalore:null,
+    note:       'Da scheda trade',
+    status:     pnlPct > 0 ? 'WIN' : 'LOSS',
+    source:     'card',
+  };
+  // Evita duplicati
+  if (!localHistory.find(x => x.label===label && Math.abs(x.entryPrice-entry)<0.0001)) {
+    localHistory.push(trade);
+    saveLocalHistory();
+    addLog('ok', `Trade reale ${label} auto-salvato dallo storico`);
+  }
+}
+
+function renderReale(){
+  const el      = document.getElementById('realeList');
+  const statsEl = document.getElementById('realeStats');
+  if (!el) return;
+
+  // Aggiorna select ticker nel form
+  const sel = document.getElementById('ft-label');
+  if (sel && !sel.options.length) {
+    Object.keys(TICKERS).forEach(l => {
+      const o = document.createElement('option');
+      o.value = l; o.textContent = l;
+      sel.appendChild(o);
+    });
+  }
+
+  const hist = [...localHistory].reverse();
+  const wins  = localHistory.filter(t=>t.status==='WIN').length;
+  const total = localHistory.length;
+  const totalPnlPct = localHistory.reduce((s,t)=>s+(t.pnlPct||0),0);
+  const totalPnlEur = localHistory.filter(t=>t.pnlEur!=null).reduce((s,t)=>s+(t.pnlEur||0),0);
+  const wr    = total ? Math.round(wins/total*100) : 0;
+
+  if (statsEl) statsEl.innerHTML = `
+    <div class="stat-mini">
+      <div class="stat-mini-label">Win rate reale</div>
+      <div class="stat-mini-val" style="color:${wr>=50?'var(--green)':'var(--red)'}">${wr}%</div>
+    </div>
+    <div class="stat-mini">
+      <div class="stat-mini-label">P&L % totale</div>
+      <div class="stat-mini-val" style="color:${totalPnlPct>=0?'var(--green)':'var(--red)'}">${fmtPct(totalPnlPct)}</div>
+    </div>
+    ${totalPnlEur !== 0 ? `
+    <div class="stat-mini">
+      <div class="stat-mini-label">P&L € reale</div>
+      <div class="stat-mini-val" style="color:${totalPnlEur>=0?'var(--green)':'var(--red)'}">${totalPnlEur>=0?'+':''}€${totalPnlEur.toFixed(2)}</div>
+    </div>
+    <div class="stat-mini">
+      <div class="stat-mini-label">Trade registrati</div>
+      <div class="stat-mini-val" style="color:var(--accent)">${total}</div>
+    </div>` : `
+    <div class="stat-mini">
+      <div class="stat-mini-label">Trade registrati</div>
+      <div class="stat-mini-val" style="color:var(--accent)">${total}</div>
+    </div>`}`;
+
+  if (!hist.length) {
+    el.innerHTML = `<div class="empty">
+      <p>Nessun trade registrato.<br>
+      Usa il form sopra per aggiungere i tuoi trade reali DEGIRO,<br>
+      oppure inserisci entrata/uscita reale nella scheda trade (tab Segnali)<br>
+      e premi "Salva in storico reale" quando chiudi.</p>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = hist.map(t => {
+    const def    = TICKERS[t.label] || {};
+    const pnl    = t.pnlPct || 0;
+    const isWin  = t.status === 'WIN';
+    const pnlEurStr = t.pnlEur != null
+      ? ` · ${t.pnlEur>=0?'+':''}€${t.pnlEur.toFixed(2)}`
+      : '';
+    const qtaStr = t.qty > 0 ? ` · ${t.qty} titoli` : '';
+    const contStr= t.controvalore ? ` · €${t.controvalore.toFixed(0)} investiti` : '';
+    return `<div class="hist-card" style="position:relative">
+      <div class="hist-icon ${isWin?'win':'loss'}">${isWin?'✅':'❌'}</div>
+      <div class="hist-body">
+        <div class="hist-top">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="hist-name">${t.label}</span>
+            ${typeBadge(def.type||'etf')}
+          </div>
+          <span class="hist-pnl ${isWin?'pos':'neg'}">${fmtPct(pnl)}${pnlEurStr}</span>
+        </div>
+        <div class="hist-bottom" style="flex-wrap:wrap;gap:6px">
+          <span class="hist-reason">Entrata: ${fmtP(t.entryPrice)}</span>
+          <span style="color:var(--border2)">·</span>
+          <span class="hist-reason">Uscita: ${fmtP(t.exitPrice)}</span>
+          ${qtaStr ? `<span style="color:var(--border2)">·</span><span class="hist-reason">${qtaStr}</span>` : ''}
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">
+          ${fmtTime(t.entryTime)}${contStr}
+          ${t.note ? ` · <em>${t.note}</em>` : ''}
+        </div>
+      </div>
+      <button onclick="deleteLocalTrade(${t.id})"
+        style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 6px">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteLocalTrade(id){
+  if (!confirm('Eliminare questo trade?')) return;
+  localHistory = localHistory.filter(t => t.id !== id);
+  saveLocalHistory();
+  renderReale();
+  showToast('Trade eliminato');
+}
+
 function switchTab(name,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -442,6 +674,7 @@ function switchTab(name,el){
   if(name==='lista')       renderLista();
   if(name==='log')         renderLog();
   if(name==='storico')     loadStorico();
+  if(name==='reale')       renderReale();
   if(name==='impostazioni')renderImpostazioni();
 }
 
@@ -509,11 +742,23 @@ function renderSignalCard(t){
   const def   = TICKERS[label] || {};
   const type  = def.type || t.type || 'etf';
   const isLev = type==='3x'||type==='inv';
-  const mp    = manualPrices[label];
-  const currentPrice = mp != null ? mp : t.entryPrice;
-  const { progress, pnl, health, healthColor } = computeHealth(t, currentPrice);
+
+  // Prezzi reali (override utente) o prezzi worker
+  const realEntry   = realPrices[label]?.entry   ?? null;
+  const realExit    = realPrices[label]?.exit     ?? null;
+  const currentPrice= manualPrices[label]         ?? t.entryPrice;
+  const entryForCalc= realEntry                   ?? t.entryPrice;
+
+  const pnl = realExit != null
+    ? (realExit - entryForCalc) / entryForCalc
+    : (currentPrice - entryForCalc) / entryForCalc;
+
+  const { progress, health, healthColor } = computeHealth(
+    {...t, entryPrice: entryForCalc}, currentPrice
+  );
   const timeLeftMin = t.timeStop ? Math.max(0,Math.round((t.timeStop-Date.now())/60000)) : 0;
-  const holdMin = t.entryTime ? Math.round((Date.now()-t.entryTime)/60000) : 0;
+  const holdMin     = t.entryTime ? Math.round((Date.now()-t.entryTime)/60000) : 0;
+  const pnlEur      = (pnl * 500).toFixed(2);
 
   return`<div class="signal-card ${isLev?'lev':'open'}" id="card-${label}">
     <div class="signal-header">
@@ -527,20 +772,57 @@ function renderSignalCard(t){
       </div>
     </div>
     <div class="signal-body">
-      <div class="signal-stat"><div class="signal-stat-label">Entrata</div><div class="signal-stat-val">${fmtP(t.entryPrice)}</div></div>
-      <div class="signal-stat"><div class="signal-stat-label">Score</div><div class="signal-stat-val" style="color:${scoreColor(t.entryScore)}">${t.entryScore!=null?t.entryScore+'/100':'—'}</div></div>
+      <div class="signal-stat">
+        <div class="signal-stat-label">Entrata worker</div>
+        <div class="signal-stat-val" style="color:var(--muted)">${fmtP(t.entryPrice)}</div>
+      </div>
+      <div class="signal-stat">
+        <div class="signal-stat-label">Score H1</div>
+        <div class="signal-stat-val" style="color:${scoreColor(t.entryScore)}">${t.entryScore!=null?t.entryScore+'/100':'—'}</div>
+      </div>
       <div class="signal-stat"><div class="signal-stat-label">TP 🎯</div><div class="signal-stat-val green">${fmtP(t.tp)}</div></div>
       <div class="signal-stat"><div class="signal-stat-label">SL 🛑</div><div class="signal-stat-val red">${fmtP(t.sl)}</div></div>
     </div>
 
-    <!-- INSERIMENTO PREZZO MANUALE -->
-    <div class="manual-price-row">
-      <label>Prezzo attuale:</label>
-      <input type="number" step="0.0001" id="mp-${label}" value="${mp||''}" placeholder="${fmtP(t.entryPrice)}"
+    <!-- PREZZI REALI DEGIRO -->
+    <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:10px 12px;margin-top:10px">
+      <div style="font-size:10px;color:var(--amber);font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">
+        📝 Prezzi reali DEGIRO
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Entrata reale</div>
+          <input type="number" step="0.0001" inputmode="decimal"
+            id="re-${label}" value="${realEntry||''}" placeholder="${fmtP(t.entryPrice)}"
+            style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;font-weight:600;padding:5px 8px;outline:none"
+            oninput="updateRealPrice('${label}','entry',this.value)">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Uscita reale</div>
+          <input type="number" step="0.0001" inputmode="decimal"
+            id="rx-${label}" value="${realExit||''}" placeholder="—"
+            style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;font-weight:600;padding:5px 8px;outline:none"
+            oninput="updateRealPrice('${label}','exit',this.value)">
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+        <span style="font-size:11px;color:var(--muted)">P&L reale su €500:</span>
+        <span id="real-pnl-${label}" style="font-size:14px;font-weight:700;color:${pnl>=0?'var(--green)':'var(--red)'}">
+          ${(realEntry||realExit) ? fmtPct(pnl)+' ('+((pnl>=0?'+':'')+pnlEur)+'€)' : '—'}
+        </span>
+      </div>
+    </div>
+
+    <!-- PREZZO CORRENTE per barra salute -->
+    <div class="manual-price-row" style="margin-top:8px">
+      <label>Prezzo corrente:</label>
+      <input type="number" step="0.0001" inputmode="decimal"
+        id="mp-${label}" value="${manualPrices[label]||''}" placeholder="${fmtP(t.entryPrice)}"
         onchange="updateManualPrice('${label}',this.value)"
-        oninput="updateManualPrice('${label}',this.value)"
-        inputmode="decimal">
-      <div class="manual-pnl" id="manual-pnl-${label}" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${mp!=null?fmtPct(pnl):'—'}</div>
+        oninput="updateManualPrice('${label}',this.value)">
+      <div class="manual-pnl" id="manual-pnl-${label}" style="color:${pnl>=0?'var(--green)':'var(--red)'}">
+        ${manualPrices[label]!=null?fmtPct(pnl):'—'}
+      </div>
     </div>
 
     <!-- BARRA SALUTE -->
@@ -552,7 +834,11 @@ function renderSignalCard(t){
       <div class="health-track">
         <div class="health-fill" id="health-fill-${label}" style="width:${progress}%;background:${healthColor}"></div>
       </div>
-      <div class="health-markers"><span style="color:var(--red)">SL ${fmtP(t.sl)}</span><span style="color:var(--muted)">●</span><span style="color:var(--green)">TP ${fmtP(t.tp)}</span></div>
+      <div class="health-markers">
+        <span style="color:var(--red)">SL ${fmtP(t.sl)}</span>
+        <span style="color:var(--muted)">●</span>
+        <span style="color:var(--green)">TP ${fmtP(t.tp)}</span>
+      </div>
     </div>
 
     <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--muted)">
@@ -561,6 +847,32 @@ function renderSignalCard(t){
     </div>
     <button class="close-btn" onclick="closeTradeManual('${label}')">Chiudi manualmente</button>
   </div>`;
+}
+
+function updateRealPrice(label, field, val){
+  const v = parseFloat(val);
+  if (!realPrices[label]) realPrices[label] = {};
+  if (isNaN(v) || v <= 0) {
+    delete realPrices[label][field];
+  } else {
+    realPrices[label][field] = v;
+  }
+  localStorage.setItem('tgRealPrices', JSON.stringify(realPrices));
+  // Ricalcola P&L reale
+  const t = Object.values(openTrades).find(x=>(x.label||'')===label);
+  if (!t) return;
+  const entry  = realPrices[label]?.entry ?? t.entryPrice;
+  const exit   = realPrices[label]?.exit  ?? null;
+  const cur    = manualPrices[label]      ?? t.entryPrice;
+  const pnl    = exit != null ? (exit-entry)/entry : (cur-entry)/entry;
+  const pnlEur = (pnl*500).toFixed(2);
+  const el = document.getElementById('real-pnl-'+label);
+  if (el) {
+    el.textContent = fmtPct(pnl)+' ('+(pnl>=0?'+':'')+pnlEur+'€)';
+    el.style.color = pnl>=0?'var(--green)':'var(--red)';
+  }
+  const badge = document.getElementById('pnl-badge-'+label);
+  if (badge) { badge.textContent=fmtPct(pnl); badge.className='badge '+(pnl>=0?'badge-green':'badge-red'); }
 }
 
 function updateManualPrice(label, val){
@@ -586,7 +898,10 @@ async function closeTradeManual(label){
     if(data.error){showToast('Errore: '+data.error);return}
     showToast(label+' chiuso ✓');
     addLog('ok','Trade '+label+' chiuso manualmente');
+    saveRealTradeFromCard(label);  // salva automaticamente in storico reale se prezzi inseriti
     delete manualPrices[label];
+    delete realPrices[label];
+    localStorage.setItem('tgRealPrices', JSON.stringify(realPrices));
     await loadSegnali(); await loadStorico();
   }catch(e){showToast('Errore chiusura');addLog('err','close '+label+': '+e.message)}
 }
