@@ -246,7 +246,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'SF Pro
           <div>
             <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Ticker</div>
             <select id="ft-label" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px">
-              ${Object.keys(TICKERS).map(l=>`<option value="${l}">${l}</option>`).join('')}
+              <!-- popolato da JS in renderReale() -->
             </select>
           </div>
           <div>
@@ -572,7 +572,7 @@ function renderReale(){
 
   // Aggiorna select ticker nel form
   const sel = document.getElementById('ft-label');
-  if (sel && !sel.options.length) {
+  if (sel) { sel.innerHTML = ""; // reset per evitare duplicati
     Object.keys(TICKERS).forEach(l => {
       const o = document.createElement('option');
       o.value = l; o.textContent = l;
