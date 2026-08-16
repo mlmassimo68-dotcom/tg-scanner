@@ -187,7 +187,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'SF Pro
     <div class="logo-dot"></div>
     <div>
       <div class="logo-text">TG<span>Scanner</span></div>
-      <div style="font-size:9px;color:var(--muted);letter-spacing:.5px;margin-top:-2px">v3.5 · ATR · H4 · RSI-div · soglie unificate 65 · età segnale</div>
+      <div style="font-size:9px;color:var(--muted);letter-spacing:.5px;margin-top:-2px">v3.2 · ATR · H4 · RSI-div</div>
     </div>
   </div>
   <button class="scan-btn" id="scanBtn" onclick="triggerScan()">
@@ -246,7 +246,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'SF Pro
           <div>
             <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Ticker</div>
             <select id="ft-label" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px">
-              <!-- popolato da JS in renderReale() -->
+              ${Object.keys(TICKERS).map(l=>`<option value="${l}">${l}</option>`).join('')}
             </select>
           </div>
           <div>
@@ -435,8 +435,20 @@ const TICKERS = {
   'DBPG': { yf:'DBPG.DE',  inv:'DBPK', type:'3x',   label:'S&P 500 3x Long',   timeStop:4 },
   'DBPK': { yf:'DBPK.DE',  inv:'DBPG', type:'inv',  label:'S&P 500 3x Short',  timeStop:4 },
   'LYMZ': { yf:'LYMZ.DE',  inv:null,   type:'etf',  label:'Lyxor MSCI',        timeStop:8 },
-  '3DEL': { yf:'3DEL.L',   inv:null,   type:'3x',   label:'DAX 3x Long',       timeStop:4 },
-  '3WTI': { yf:'3OIL.L',   inv:null,   type:'3x',   label:'Oil 3x Long',       timeStop:4 },
+  '3DEL': { yf:'3DEL.L',   inv:'3DES', type:'3x',   label:'DAX 3x Long',       timeStop:4 },
+  '3DES': { yf:'3DES.DE',  inv:'3DEL', type:'inv',  label:'DAX 3x Short',      timeStop:4 },
+  '3WTI': { yf:'3OIL.L',   inv:'3SOI', type:'3x',   label:'Oil (WTI) 3x Long', timeStop:4 },
+  '3SOI': { yf:'3SOI.DE',  inv:'3WTI', type:'inv',  label:'Oil (WTI) 3x Short',timeStop:4 },
+  'PCFH': { yf:'PCFH.DE',  inv:'PCFG', type:'3x',   label:'Silver 3x Long',    timeStop:4 },
+  'PCFG': { yf:'PCFG.DE',  inv:'PCFH', type:'inv',  label:'Silver 3x Short',   timeStop:4 },
+  'PCFP': { yf:'PCFP.DE',  inv:'PCFN', type:'3x',   label:'Gold 3x Long',      timeStop:4 },
+  'PCFN': { yf:'PCFN.DE',  inv:'PCFP', type:'inv',  label:'Gold 3x Short',     timeStop:4 },
+  'NGXA': { yf:'NGXA.DE',  inv:'3BFS', type:'3x',   label:'Brent Oil 3x Long', timeStop:4 },
+  '3BFS': { yf:'3BFS.DE',  inv:'NGXA', type:'inv',  label:'Brent Oil 3x Short',timeStop:4 },
+  'NGXL': { yf:'NGXL.DE',  inv:'NGXS', type:'3x',   label:'Nat.Gas 3x Long',   timeStop:4 },
+  'NGXS': { yf:'NGXS.DE',  inv:'NGXL', type:'inv',  label:'Nat.Gas 3x Short',  timeStop:4 },
+  'US9L': { yf:'US9L.DE',  inv:'US9S', type:'3x',   label:'S&P500 3x Long',    timeStop:4 },
+  'US9S': { yf:'US9S.DE',  inv:'US9L', type:'inv',  label:'S&P500 3x Short',   timeStop:4 },
   'QUTM': { yf:'QUTM.DE',  inv:null,   type:'them', label:'Quantum Computing',  timeStop:8 },
   'WIRE': { yf:'WIRE.DE',  inv:null,   type:'them', label:'Electric Vehicles',  timeStop:8 },
   'HYCN': { yf:'HYCN.DE',  inv:null,   type:'them', label:'Hydrogen',           timeStop:8 },
@@ -572,7 +584,7 @@ function renderReale(){
 
   // Aggiorna select ticker nel form
   const sel = document.getElementById('ft-label');
-  if (sel) { sel.innerHTML = ""; // reset per evitare duplicati
+  if (sel && !sel.options.length) {
     Object.keys(TICKERS).forEach(l => {
       const o = document.createElement('option');
       o.value = l; o.textContent = l;
