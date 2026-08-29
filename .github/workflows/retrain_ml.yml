@@ -1,0 +1,31 @@
+name: TG Scanner ML Retrain
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install yfinance scikit-learn pandas numpy requests
+      - name: Run ML retrain
+        env:
+          WORKER_URL:    ${{ secrets.WORKER_URL }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_API_TOKEN:  ${{ secrets.CF_API_TOKEN }}
+          CF_KV_NS_ID:   ${{ secrets.CF_KV_NS_ID }}
+          TG_TOKEN:      ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID:    ${{ secrets.TG_CHAT_ID }}
+        run: python retrain_ml.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tg-scanner-model
+          path: tg_scanner_model.json
+          retention-days: 90
