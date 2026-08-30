@@ -4,7 +4,7 @@ TG Scanner ML — Riaddestramento automatico settimanale
 Eseguito da GitHub Actions ogni lunedì alle 10:00 IT
 """
 
-import os, json, sys, requests, warnings
+import os, json, sys, requests, warnings, time, random
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -32,6 +32,19 @@ YF_MAP = {
     'DFEN':'DFEN.DE', 'EUNL':'EUNL.DE',  'EXS1':'EXS1.DE',  'DBPE':'DBPE.DE',
 }
 LEVERAGED = {'3QQQ','3QSS','DBPG','DBPK','3DEL','3WTI'}
+TICKER_TYPE = {
+    '3QQQ':'3x','3QSS':'inv','SXRV':'etf','SXR8':'etf',
+    'DBPG':'3x','DBPK':'inv','LYMZ':'etf','3DEL':'3x',
+    '3WTI':'3x','QUTM':'them','WIRE':'them','SEC0':'them',
+    'JEDI':'them','IART':'them','AIFS':'them','DFEN':'them',
+    'EUNL':'etf','EXS1':'etf','DBPE':'etf',
+}
+TP_SL = {
+    '3x':  (0.035, 0.018, 4),
+    'inv': (0.035, 0.018, 4),
+    'etf': (0.020, 0.012, 8),
+    'them':(0.015, 0.010, 8),
+}
 
 FEATURE_COLS = [
     'entry_score','ema_cross','ema_accel','rsi','rsi_rising','rsi_oversold',
@@ -173,24 +186,131 @@ def extract_features(trade):
     except:
         return features_from_trade_only(trade)
 
+
+def compute_score_bt(closes, volumes):
+    """Scoring semplificato per backtesting."""
+    n = len(closes)
+    if n < 20: return 50
+    c = pd.Series(closes)
+    v = pd.Series(volumes)
+    score = 50
+    e20 = c.ewm(span=20,adjust=False).mean()
+    e50 = c.ewm(span=min(50,n),adjust=False).mean()
+    tS = 0
+    if e20.iloc[-1] > e50.iloc[-1]: tS += 15
+    if len(e20) > 1 and e20.iloc[-1] > e20.iloc[-2]: tS += 5
+    score += (tS - 12.5)
+    delta = c.diff()
+    ag = delta.clip(lower=0).ewm(span=14,adjust=False).mean()
+    al = (-delta.clip(upper=0)).ewm(span=14,adjust=False).mean()
+    rsi = (100 - 100/(1+ag/al.replace(0,np.nan))).iloc[-1]
+    rS = 18 if rsi < 35 else (8 if rsi > 65 else 20*((rsi-35)/30)*0.7)
+    score += (rS - 10)
+    ml = c.ewm(span=12,adjust=False).mean() - c.ewm(span=26,adjust=False).mean()
+    ms = ml.ewm(span=9,adjust=False).mean()
+    mS = 12.5 if ml.iloc[-1] > ms.iloc[-1] else 0
+    if ml.iloc[-1] > 0: mS += 5
+    score += (mS - 12.5)
+    vm = v.rolling(min(20,n)).mean().iloc[-1]
+    vol_r = v.iloc[-1]/vm if vm and vm > 0 else 1
+    score += (min(15*vol_r/3,15) if vol_r >= 1.5 else 4.5) - 7.5
+    return max(0, min(100, round(score)))
+
+def run_backtesting():
+    """Genera trade simulati su 2 anni di dati storici."""
+    print('📊 Backtesting su 2 anni di dati storici...')
+    bt_trades = []
+    SCORE_BUY = 75
+
+    for label, yf_sym in YF_MAP.items():
+        try:
+            df = yf.download(yf_sym, period='2y', interval='1h',
+                           progress=False, auto_adjust=True)
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            if len(df) < 60: continue
+
+            df = df.dropna()
+            closes  = df['Close'].astype(float).tolist()
+            volumes = df['Volume'].astype(float).tolist()
+            highs   = df['High'].astype(float).tolist()
+            lows    = df['Low'].astype(float).tolist()
+            times   = df.index.tolist()
+
+            ticker_type = TICKER_TYPE.get(label, 'etf')
+            tp_pct, sl_pct, hold_h = TP_SL.get(ticker_type, (0.02, 0.012, 8))
+            is_lev = 1 if label in LEVERAGED else 0
+            n_signals = 0
+            i = 60
+
+            while i < len(closes) - hold_h - 1:
+                score = compute_score_bt(closes[max(0,i-60):i], volumes[max(0,i-60):i])
+                if score >= SCORE_BUY:
+                    entry = closes[i]
+                    tp = entry * (1 + tp_pct)
+                    sl = entry * (1 - sl_pct)
+                    exit_price = entry
+                    exit_reason = 'TIME'
+                    for j in range(1, hold_h + 1):
+                        if i+j >= len(highs): break
+                        if highs[i+j] >= tp: exit_price = tp; exit_reason = 'TP'; break
+                        if lows[i+j] <= sl:  exit_price = sl; exit_reason = 'SL'; break
+                        exit_price = closes[i+j]
+                    pnl = (exit_price - entry) / entry
+                    ts  = times[i]
+                    it_h = (ts.hour + 2) % 24 if hasattr(ts,'hour') else 12
+                    bt_trades.append({
+                        'label':label,'entryPrice':entry,'exitPrice':exit_price,
+                        'entryTime':int(ts.timestamp()*1000) if hasattr(ts,'timestamp') else 0,
+                        'exitTime':0,'entryScore':score,'exitReason':exit_reason,
+                        'pnlPct':pnl,'status':'WIN' if pnl>0 else 'LOSS',
+                        'source':'backtest','weight':1,'h4Score':55,
+                        'atrPct':0.008,'rsi':50,
+                        'hour_norm':max(0,min(1,(it_h-9)/8)),'is_leveraged':is_lev,
+                    })
+                    n_signals += 1
+                    i += hold_h + 1
+                else:
+                    i += 1
+            print(f'  {label}: {n_signals} segnali')
+            time.sleep(0.3)
+        except Exception as e:
+            print(f'  {label}: {e}')
+
+    wins = sum(1 for t in bt_trades if t['status']=='WIN')
+    print(f'✅ Backtesting: {len(bt_trades)} trade (WR:{wins/max(len(bt_trades),1)*100:.1f}%)')
+    return bt_trades
+
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 def main():
     now = datetime.now().strftime('%d/%m/%Y %H:%M')
     print(f'[{now}] TG Scanner ML Retrain avviato')
 
-    # 1. Scarica storico
+    # 1. Scarica storico trade reali
     print('Scarico storico dal worker...')
     resp = requests.get(f'{WORKER_URL}/history', timeout=15)
     trades_raw = resp.json()
-    trades = [t for t in trades_raw
-              if t.get('entryPrice') and t.get('exitPrice')
-              and t.get('status') in ('WIN','LOSS')]
-    print(f'Trade utilizzabili: {len(trades)}')
+    trades_reali = [t for t in trades_raw
+                    if t.get('entryPrice') and t.get('exitPrice')
+                    and t.get('status') in ('WIN','LOSS')]
+    print(f'Trade reali: {len(trades_reali)}')
+
+    # 1b. Backtesting su dati storici
+    bt_trades = run_backtesting()
+
+    # 1c. Combina con pesatura (reali × 3, backtest × 1)
+    trades = []
+    for t in trades_reali:
+        tc = dict(t); tc['weight']=3; tc['source']='real'
+        trades.extend([tc, tc, tc])
+    trades.extend(bt_trades)
+    random.shuffle(trades)
+    print(f'Dataset ibrido: {len(trades)} campioni totali')
+    print(f'  Reali: {len(trades_reali)}×3={len(trades_reali)*3} | Backtest: {len(bt_trades)}')
 
     if len(trades) < 20:
-        msg = f'⚠️ <b>ML Retrain</b> — Solo {len(trades)} trade nello storico. Riaddestramento saltato (minimo 20).'
+        msg = f'⚠️ <b>ML Retrain</b> — Dataset troppo piccolo ({len(trades)}). Skip.'
         send_telegram(msg)
-        print('Trade insufficienti, uscita.')
         sys.exit(0)
 
     # 2. Estrai feature
@@ -272,7 +392,7 @@ def main():
     msg = (
         f'🤖 <b>ML Retrain completato</b>\n\n'
         f'📅 {now}\n'
-        f'📊 Trade: {len(X)} (WIN:{wins} LOSS:{len(y)-wins})\n'
+        f'📊 Trade reali: {len(trades_reali)} | Backtest: {len(bt_trades)}\n'
         f'🎯 Accuracy: {acc:.1%}\n'
         f'📈 AUC: {auc:.3f}\n'
         f'💾 Modello: {status}\n\n'
