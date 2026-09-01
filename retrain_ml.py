@@ -220,7 +220,7 @@ def run_backtesting():
     """Genera trade simulati su 2 anni di dati storici."""
     print('📊 Backtesting su 2 anni di dati storici...')
     bt_trades = []
-    SCORE_BUY = 75
+    SCORE_BUY = 60
 
     for label, yf_sym in YF_MAP.items():
         try:
