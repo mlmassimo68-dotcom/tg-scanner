@@ -114,6 +114,8 @@ def features_from_trade_only(trade):
         'hour_norm':      max(0.0, min(1.0, (entry_ts.hour - 9) / 8)),
         'pnl_pct':        float(trade.get('pnlPct') or 0),
         'label_win':      1 if trade['status'] == 'WIN' else 0,
+        'source':         trade.get('source','real'),
+        'weight':         float(trade.get('weight', 1)),
     }
 
 def extract_features(trade):
@@ -182,6 +184,8 @@ def extract_features(trade):
             'h4_trend':h4t,'is_leveraged':1 if label in LEVERAGED else 0,'hour_norm':hour_norm,
             'pnl_pct':float(trade.get('pnlPct') or 0),
             'label_win':1 if trade['status']=='WIN' else 0,
+            'source': trade.get('source','real'),
+            'weight': float(trade.get('weight', 1)),
         }
     except:
         return features_from_trade_only(trade)
@@ -220,7 +224,7 @@ def run_backtesting():
     """Genera trade simulati su 2 anni di dati storici."""
     print('📊 Backtesting su 2 anni di dati storici...')
     bt_trades = []
-    SCORE_BUY = 60
+    SCORE_BUY = 65
 
     for label, yf_sym in YF_MAP.items():
         try:
@@ -298,15 +302,22 @@ def main():
     # 1b. Backtesting su dati storici
     bt_trades = run_backtesting()
 
-    # 1c. Combina con pesatura (reali × 3, backtest × 1)
+    # 1c. Combina con pesatura (reali × 3, backtest × 1) e cap sul rapporto backtest/reali
     trades = []
     for t in trades_reali:
         tc = dict(t); tc['weight']=3; tc['source']='real'
         trades.extend([tc, tc, tc])
+
+    MAX_BT_RATIO = 5  # backtest max 5x il numero di trade reali (pre-moltiplicazione)
+    max_bt = max(len(trades_reali) * MAX_BT_RATIO, 30)
+    if len(bt_trades) > max_bt:
+        random.shuffle(bt_trades)
+        bt_trades = bt_trades[:max_bt]
+
     trades.extend(bt_trades)
     random.shuffle(trades)
     print(f'Dataset ibrido: {len(trades)} campioni totali')
-    print(f'  Reali: {len(trades_reali)}×3={len(trades_reali)*3} | Backtest: {len(bt_trades)}')
+    print(f'  Reali: {len(trades_reali)}×3={len(trades_reali)*3} | Backtest (capped): {len(bt_trades)}')
 
     if len(trades) < 20:
         msg = f'⚠️ <b>ML Retrain</b> — Dataset troppo piccolo ({len(trades)}). Skip.'
@@ -332,8 +343,11 @@ def main():
     # 3. Addestra
     X = df_ml[FEATURE_COLS].values
     y = df_ml['label_win'].values
+    sw = df_ml['weight'].values.astype(float)  # peso extra: trade reali contano di più
     wins = y.sum()
     print(f'WIN: {wins}  LOSS: {len(y)-wins}  WR: {wins/len(y)*100:.1f}%')
+    n_real = (df_ml['source']=='real').sum()
+    print(f'  di cui reali: {n_real} | backtest: {len(df_ml)-n_real}')
 
     n_splits = min(5, max(3, len(X) // 8))
     cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
@@ -341,9 +355,10 @@ def main():
         ('scaler', StandardScaler()),
         ('clf', LogisticRegression(C=0.5, class_weight='balanced', max_iter=500, random_state=42))
     ])
-    scores_acc = cross_val_score(pipeline, X, y, cv=cv, scoring='accuracy')
-    scores_auc = cross_val_score(pipeline, X, y, cv=cv, scoring='roc_auc')
-    pipeline.fit(X, y)
+    fit_params = {'clf__sample_weight': sw}
+    scores_acc = cross_val_score(pipeline, X, y, cv=cv, scoring='accuracy', params=fit_params)
+    scores_auc = cross_val_score(pipeline, X, y, cv=cv, scoring='roc_auc', params=fit_params)
+    pipeline.fit(X, y, **fit_params)
 
     acc = scores_acc.mean()
     auc = scores_auc.mean()
