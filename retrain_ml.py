@@ -299,8 +299,17 @@ def main():
                     and t.get('status') in ('WIN','LOSS')]
     print(f'Trade reali: {len(trades_reali)}')
 
-    # 1b. Backtesting su dati storici
+    # 1b. Backtesting su dati storici (attualmente disattivato dal training: il segnale
+    # generato da compute_score_bt è troppo rumoroso rispetto allo scoring reale del worker
+    # e degrada AUC/accuracy anche con pesatura e cap stretti. Lo eseguiamo comunque per
+    # log/monitoraggio, ma USE_BACKTEST_IN_TRAINING=False lo esclude dal dataset finale.)
+    USE_BACKTEST_IN_TRAINING = False
     bt_trades = run_backtesting()
+    if not USE_BACKTEST_IN_TRAINING:
+        print(f'  ℹ️ Backtest generato ({len(bt_trades)} trade) ma ESCLUSO dal training (USE_BACKTEST_IN_TRAINING=False)')
+        bt_trades_for_training = []
+    else:
+        bt_trades_for_training = bt_trades
 
     # 1c. Combina con pesatura (reali × 3, backtest × 1) e cap sul rapporto backtest/reali
     trades = []
@@ -310,14 +319,14 @@ def main():
 
     MAX_BT_RATIO = 5  # backtest max 5x il numero di trade reali (pre-moltiplicazione)
     max_bt = max(len(trades_reali) * MAX_BT_RATIO, 30)
-    if len(bt_trades) > max_bt:
-        random.shuffle(bt_trades)
-        bt_trades = bt_trades[:max_bt]
+    if len(bt_trades_for_training) > max_bt:
+        random.shuffle(bt_trades_for_training)
+        bt_trades_for_training = bt_trades_for_training[:max_bt]
 
-    trades.extend(bt_trades)
+    trades.extend(bt_trades_for_training)
     random.shuffle(trades)
     print(f'Dataset ibrido: {len(trades)} campioni totali')
-    print(f'  Reali: {len(trades_reali)}×3={len(trades_reali)*3} | Backtest (capped): {len(bt_trades)}')
+    print(f'  Reali: {len(trades_reali)}×3={len(trades_reali)*3} | Backtest usati nel training: {len(bt_trades_for_training)} (generati: {len(bt_trades)})')
 
     if len(trades) < 20:
         msg = f'⚠️ <b>ML Retrain</b> — Dataset troppo piccolo ({len(trades)}). Skip.'
@@ -407,7 +416,7 @@ def main():
     msg = (
         f'🤖 <b>ML Retrain completato</b>\n\n'
         f'📅 {now}\n'
-        f'📊 Trade reali: {len(trades_reali)} | Backtest: {len(bt_trades)}\n'
+        f'📊 Trade reali: {len(trades_reali)} | Backtest: {len(bt_trades)} (generati, esclusi dal training)\n'
         f'🎯 Accuracy: {acc:.1%}\n'
         f'📈 AUC: {auc:.3f}\n'
         f'💾 Modello: {status}\n\n'
