@@ -187,7 +187,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'SF Pro
     <div class="logo-dot"></div>
     <div>
       <div class="logo-text">TG<span>Scanner</span></div>
-      <div style="font-size:9px;color:var(--muted);letter-spacing:.5px;margin-top:-2px">v3.5 · ATR · H4 · RSI-div · ML</div>
+      <div style="font-size:9px;color:var(--muted);letter-spacing:.5px;margin-top:-2px" id="workerVersionLabel">v… · ATR · H4 · RSI-div · ML</div>
     </div>
   </div>
   <button class="scan-btn" id="scanBtn" onclick="triggerScan()">
@@ -1141,9 +1141,21 @@ function computeScoreJS(candles){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
+async function loadWorkerVersion(){
+  const el = document.getElementById('workerVersionLabel');
+  try{
+    const h = await apiGet('/health');
+    if(el) el.textContent = `v${h.version} · ATR · H4 · RSI-div · ML`;
+  }catch(e){
+    if(el) el.textContent = 'v? · offline';
+    addLog('err','health: '+e.message);
+  }
+}
+
 document.addEventListener('DOMContentLoaded',()=>{
   renderImpostazioni();
   loadSegnali();
+  loadWorkerVersion();
   addLog('info','Dashboard avviata · worker: '+WORKER_URL);
 });
 
