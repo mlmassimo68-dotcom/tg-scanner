@@ -210,6 +210,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'SF Pro
 
   <!-- CLASSIFICA -->
   <div class="page" id="page-classifica">
+    <div class="card" id="scoreHistoryCard" style="margin-bottom:10px">
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleScoreHistory()">
+        <span>Storico soglie score (per tarare la soglia)</span>
+        <span id="scoreHistoryToggleIcon" style="color:var(--accent)">▾</span>
+      </div>
+      <div id="scoreHistoryBody"><div class="empty" style="padding:16px"><p style="font-size:12px">Caricamento…</p></div></div>
+    </div>
     <div class="refresh-row">
       <span class="last-update" id="lastUpdateClassifica">—</span>
       <button class="refresh-btn" onclick="loadClassifica()">↻ Aggiorna</button>
@@ -908,6 +915,7 @@ async function closeTradeManual(label){
 
 // ── CLASSIFICA ────────────────────────────────────────────────────────────
 async function loadClassifica(){
+  loadScoreHistory();
   const el=document.getElementById('classificaList');
   el.innerHTML='<div class="empty"><p>Caricamento prezzi via worker…</p></div>';
   try{
@@ -948,6 +956,73 @@ async function loadClassifica(){
   }catch(e){
     el.innerHTML=`<div class="empty"><p style="color:var(--red)">Errore: ${e.message}</p></div>`;
     addLog('err','Classifica: '+e.message);
+  }
+}
+
+// ── STORICO SOGLIE SCORE (per tarare SCORE_BUY) ────────────────────────────
+let scoreHistoryOpen = localStorage.getItem('scoreHistoryOpen') !== '0'; // aperto di default la prima volta
+let scoreHistoryLoaded = false;
+
+function toggleScoreHistory(){
+  scoreHistoryOpen = !scoreHistoryOpen;
+  localStorage.setItem('scoreHistoryOpen', scoreHistoryOpen ? '1' : '0');
+  document.getElementById('scoreHistoryBody').style.display = scoreHistoryOpen ? '' : 'none';
+  document.getElementById('scoreHistoryToggleIcon').textContent = scoreHistoryOpen ? '▾' : '▸';
+  if(scoreHistoryOpen && !scoreHistoryLoaded) loadScoreHistory();
+}
+
+async function loadScoreHistory(){
+  const body = document.getElementById('scoreHistoryBody');
+  const icon = document.getElementById('scoreHistoryToggleIcon');
+  if(icon) icon.textContent = scoreHistoryOpen ? '▾' : '▸';
+  if(body) body.style.display = scoreHistoryOpen ? '' : 'none';
+  if(!scoreHistoryOpen) return;
+  try{
+    const data = await apiGet('/classifica-history');
+    scoreHistoryLoaded = true;
+    if(!data.days || data.days.length===0){
+      body.innerHTML = `<div class="empty" style="padding:16px"><p style="font-size:12px">Ancora nessuno storico raccolto.<br>Torna qui tra qualche giorno di borsa aperta.</p></div>`;
+      return;
+    }
+    const th = data.thresholds; // es. [60,65,67,68,70,72,75]
+    const days = data.days.slice(-14); // ultimi 14 giorni per non appesantire la vista
+    const headerCols = th.map(t=>`<th style="text-align:center;padding:4px 3px">≥${t}</th>`).join('');
+    const rows = days.map(d=>{
+      const cells = th.map(t=>{
+        const n = d.countAtThreshold[`>=${t}`] || 0;
+        const color = n>0 ? 'var(--text)' : 'var(--muted)';
+        return `<td style="text-align:center;padding:4px 3px;color:${color}">${n}</td>`;
+      }).join('');
+      const dateShort = d.date.slice(5).split('-').reverse().join('/'); // DD/MM
+      return `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:4px 6px;font-size:11px;white-space:nowrap">${dateShort}</td>
+        <td style="padding:4px 3px;text-align:center;font-size:11px;color:var(--green)">${d.maxScore}</td>
+        <td style="padding:4px 3px;text-align:center;font-size:11px;color:var(--muted)">${d.minScore}</td>
+        <td style="padding:4px 3px;text-align:center;font-size:11px">${d.avgScore}</td>
+        ${cells}
+      </tr>`;
+    }).join('');
+    body.innerHTML = `
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px">
+        ${days.length} giorni raccolti · quante volte ogni ticker ha toccato ciascuna soglia score nella giornata
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr style="color:var(--muted)">
+              <th style="text-align:left;padding:4px 6px">Data</th>
+              <th style="text-align:center;padding:4px 3px">Max</th>
+              <th style="text-align:center;padding:4px 3px">Min</th>
+              <th style="text-align:center;padding:4px 3px">Media</th>
+              ${headerCols}
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }catch(e){
+    body.innerHTML = `<div class="empty" style="padding:16px"><p style="color:var(--red);font-size:12px">Errore: ${e.message}</p></div>`;
+    addLog('err','scoreHistory: '+e.message);
   }
 }
 
